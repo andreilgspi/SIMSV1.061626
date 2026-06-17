@@ -4,6 +4,7 @@ node_modules/
 # Database files
 *.db
 *.db-journal
+*.sims.db
 
 # Logs
 *.log

@@ -1,2 +1,6 @@
-# ProjectManagementV1.061626
- A full-stack project management app with React frontend, Node.js backend, and SQLite database. Features: project dashboard (view-only metrics, charts, phase summary) and workbook (data entry with dropdowns).
+SIMS - Smart Inventory Management System
+
+A full-stack project management tool featuring:
+• Dashboard - Real-time project metrics, charts, phase summary
+• Workbook - Data entry with dropdowns (no Excel required)
+• Tech: React, Node.js, Express, SQLite, Tailwind CSS

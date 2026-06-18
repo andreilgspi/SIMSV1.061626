@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import Workbook from './components/Workbook';
 import Projects from './components/Projects';
 import Milestones from './components/Milestones';
+import SprintTracker from './components/SprintTracker'; // 1. Import Sprint Tracker
 import './App.css';
 
 function App() {
@@ -86,6 +87,7 @@ function App() {
             <Link to="/">Dashboard</Link>
             <Link to="/workbook">Workbook</Link>
             <Link to="/milestones">Milestones</Link>
+            <Link to="/sprint-tracker">Sprint Tracker</Link> {/* 2. Add Nav Link */}
           </div>
           {selectedProject && (
             <div className="project-selector">
@@ -122,6 +124,10 @@ function App() {
             <Milestones 
               selectedProject={selectedProject}
             />
+          } />
+          {/* 3. Add Sprint Tracker Routing */}
+          <Route path="/sprint-tracker" element={
+            <SprintTracker />
           } />
         </Routes>
       </div>

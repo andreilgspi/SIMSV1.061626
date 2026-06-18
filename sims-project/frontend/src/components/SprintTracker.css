@@ -1,0 +1,184 @@
+.sprint-tracker-view {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.tracker-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 16px;
+}
+
+.tracker-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+.tracker-card {
+  padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tracker-table {
+  width: 100%;
+  min-width: 1200px; /* Assures readable layouts on smaller horizontal responsive views */
+  border-collapse: collapse;
+}
+
+/* Custom Add Option Styling inside Dropdowns */
+.add-new-option-item {
+  font-weight: 600;
+  color: #007aff !important;
+  background-color: #f2f2f7;
+}
+
+/* Row display rules */
+.static-cell-text {
+  font-size: 0.9rem;
+  color: #1c1c1e;
+  display: inline-block;
+  padding: 4px 0;
+}
+
+.font-semibold {
+  font-weight: 500;
+}
+
+.notes-text {
+  color: #8e8e93;
+  font-size: 0.85rem;
+}
+
+.row-editing {
+  background-color: rgba(0, 122, 255, 0.02) !important;
+}
+
+/* Minimalist Input Form Elements */
+.ios-table-input,
+.ios-table-select {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(60, 60, 67, 0.15);
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #1c1c1e;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.ios-table-input:focus,
+.ios-table-select:focus {
+  outline: none;
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.ios-table-select-multiple {
+  min-height: 50px;
+  max-height: 65px;
+  padding: 4px;
+}
+
+.ios-helper-text {
+  display: block;
+  font-size: 0.65rem;
+  color: #8e8e93;
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* Beautiful Status and Priority Badges */
+.ios-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+/* Priority Indicator Badges */
+.priority-critical { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
+.priority-high { background: rgba(255, 149, 0, 0.12); color: #ff9500; }
+.priority-medium { background: rgba(0, 122, 255, 0.12); color: #007aff; }
+.priority-low { background: rgba(142, 142, 147, 0.15); color: #8e8e93; }
+
+/* Status Indicator Badges */
+.status-done { background: rgba(52, 199, 89, 0.12); color: #34c759; }
+.status-in-progress { background: rgba(90, 200, 250, 0.15); color: #007aff; }
+.status-blocked { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
+.status-to-do { background: rgba(142, 142, 147, 0.12); color: #1c1c1e; }
+
+.badge-count {
+  background: #f2f2f7;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Mini Action Buttons CSS Framework */
+.action-button-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.btn-edit {
+  background-color: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+}
+.btn-edit:hover { background-color: rgba(0, 122, 255, 0.2); }
+
+.btn-save {
+  background-color: #34c759;
+  color: white;
+}
+.btn-save:hover { background-color: #28a745; }
+
+.btn-delete {
+  background-color: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+.btn-delete:hover { background-color: rgba(255, 59, 48, 0.2); }
+
+/* System Responsiveness Styles Rules (Media Queries) */
+@media (max-width: 768px) {
+  .sprint-tracker-view {
+    padding: 1rem;
+  }
+  
+  .tracker-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .ios-button {
+    width: 100%;
+    text-align: center;
+  }
+}

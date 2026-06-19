@@ -1,10 +1,23 @@
 /* =========================================
-   1. CORE LAYOUT & CONTAINERS
+   1. CORE LAYOUT & MASTER CARD CONTAINER
    ========================================= */
 .sprint-tracker-view {
   padding: 2rem;
-  max-width: 1400px;
+  max-width: 1600px; /* Expanded so tables have much more room */
+  width: 98%;
   margin: 0 auto;
+}
+
+/* --- The New "Bigger Card" Wrapper --- */
+.master-wrapper-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(60, 60, 67, 0.04);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 80vh;
 }
 
 .tracker-header-row {
@@ -21,51 +34,67 @@
   color: #1c1c1e;
 }
 
+/* Flat, sleek outline for inner table cards */
 .tracker-card {
   padding: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: transparent; 
+  border: 1px solid rgba(60, 60, 67, 0.08); /* Sleek subtle outline */
+  border-radius: 16px;
+  width: 100%;
 }
 
-/* --- Modern Segmented Control Tabs --- */
+/* --- Redesigned Segmented Control Tabs --- */
 .tracker-tabs {
   display: inline-flex;
-  background: rgba(142, 142, 147, 0.12); /* Subtle gray track */
-  padding: 4px;
-  border-radius: 12px;
-  margin-bottom: 24px;
+  gap: 24px;
+  margin-bottom: 32px; /* Extra breathing room below tabs */
+  border-bottom: 1px solid rgba(60, 60, 67, 0.08); /* Sleek bottom track line */
+  background: transparent; 
+  padding: 0;
+  width: 100%;
 }
 
 .tab-btn {
   background: transparent;
   border: none;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: #6c6c70;
-  padding: 8px 20px;
+  color: #8e8e93;
+  padding: 8px 12px 14px 12px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  transition: color 0.25s ease;
 }
 
-.tab-btn:hover {
-  color: #1c1c1e;
+.tab-btn:hover { color: #1c1c1e; }
+.tab-btn.active { color: #1c1c1e; }
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #007aff, #50bcf2);
+  border-radius: 3px 3px 0 0;
+  animation: slideInLine 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.tab-btn.active {
-  background: #ffffff;
-  color: #1c1c1e;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04);
+@keyframes slideInLine {
+  from { transform: scaleX(0.5); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
 }
 
 /* =========================================
    2. TABLE & SCROLL ARCHITECTURE
    ========================================= */
 .scrollable-table-container {
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 300px);
   overflow-y: auto;
   overflow-x: auto;
-  border: 1px solid rgba(60, 60, 67, 0.08);
+  width: 100%;
 }
 
 .table-responsive {
@@ -78,24 +107,24 @@
   width: 100%;
   min-width: 1200px; 
   border-collapse: collapse;
-  overflow: visible !important; /* Overrides App.css to allow popovers and sticky headers */
+  overflow: visible !important; 
 }
 
 .ios-table.tracker-table th {
   position: sticky;
   top: 0;
-  z-index: 20; /* Stays above rows */
+  z-index: 20; 
   background: #f8f8fa;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); 
   border-bottom: 1px solid rgba(60, 60, 67, 0.1);
 }
 
 /* =========================================
-   3. ROW & TEXT STYLING
+   3. ROW, TEXT & INPUT STYLING
    ========================================= */
 .row-editing {
-  background: linear-gradient(90deg, rgba(0, 122, 255, 0.05) 0%, rgba(0, 122, 255, 0.02) 100%) !important;
-  box-shadow: inset 3px 0 0 #007aff; 
+  background: linear-gradient(90deg, rgba(0, 122, 255, 0.04) 0%, rgba(0, 122, 255, 0.01) 100%) !important;
+  box-shadow: inset 4px 0 0 #007aff; 
 }
 
 .static-cell-text {
@@ -110,13 +139,10 @@
 .font-semibold { font-weight: 500; }
 .notes-text { color: #8e8e93; font-size: 0.85rem; }
 
-/* =========================================
-   4. FORM INPUTS & SELECTS
-   ========================================= */
 .ios-table-input,
 .ios-table-select {
   width: 100%;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid rgba(60, 60, 67, 0.15);
   border-radius: 8px;
   background-color: #ffffff;
@@ -129,8 +155,8 @@
 
 .ios-table-textarea {
   width: 100%;
-  min-height: 36px;
-  padding: 0.4rem 0.6rem;
+  min-height: 38px;
+  padding: 0.5rem 0.75rem;
   border: 1px solid rgba(60, 60, 67, 0.15);
   border-radius: 8px;
   background-color: #ffffff;
@@ -164,7 +190,7 @@
 }
 
 /* =========================================
-   5. INTERACTIVE ASSIGNEE TAGS & POPOVER
+   4. INTERACTIVE ASSIGNEE TAGS & POPOVER
    ========================================= */
 .assignee-tags-container {
   display: flex;
@@ -188,14 +214,13 @@
 }
 
 .assignee-tag.selected { background: #007aff; color: #ffffff; }
-.assignee-tag.view-only { cursor: default; background: rgba(0, 122, 255, 0.1); color: #007aff; }
+.assignee-tag.view-only { cursor: default; background: rgba(0, 122, 255, 0.08); color: #007aff; }
 .assignee-tag.more-tag { cursor: pointer; background: #e5e5ea; color: #8e8e93; }
 .assignee-tag.more-tag:hover { background: #d1d1d6; }
 
-/* The new "Hover Above" Popover */
 .assignee-popover {
   position: absolute;
-  bottom: 100%; /* Forces it to appear ABOVE the row */
+  bottom: 100%; 
   left: 50%;
   transform: translateX(-50%);
   width: 220px;
@@ -204,11 +229,10 @@
   padding: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05);
   z-index: 999 !important;
-  margin-bottom: 12px; /* Gap between row and popover */
+  margin-bottom: 12px; 
   animation: popoverFadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* The little downward triangle tail */
 .assignee-popover::after {
   content: '';
   position: absolute;
@@ -247,7 +271,7 @@
 }
 
 /* =========================================
-   6. BADGES & ACTION BUTTONS
+   5. BADGES & BUTTONS
    ========================================= */
 .ios-badge {
   display: inline-block;
@@ -300,8 +324,40 @@
 .btn-delete { background-color: rgba(255, 59, 48, 0.1); color: #ff3b30; }
 .btn-delete:hover { background-color: rgba(255, 59, 48, 0.2); }
 
+.btn-gradient {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+}
+
+.btn-gradient:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35);
+}
+
+.ios-button-secondary {
+  background: rgba(142, 142, 147, 0.12);
+  color: #1c1c1e;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ios-button-secondary:hover { background: rgba(142, 142, 147, 0.2); }
+
 /* =========================================
-   7. FLOATING MODALS (ADD SPRINT / DELETE)
+   6. DRAGGABLE FILTER & MODALS
    ========================================= */
 .floating-prompt-panel {
   position: fixed;
@@ -338,35 +394,82 @@
   margin-top: 16px;
 }
 
-.floating-prompt-actions button {
-  flex: 1;
-  padding: 8px;
+.floating-prompt-actions button { flex: 1; padding: 8px; }
+
+/* Filter Panel Updates */
+.filter-panel {
+  position: fixed;
+  width: 320px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  z-index: 999;
+  border-top: 4px solid #007aff;
 }
 
-.ios-button-secondary {
-  background: rgba(142, 142, 147, 0.12);
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(60, 60, 67, 0.1);
+  background: rgba(0, 122, 255, 0.02);
+  border-radius: 12px 12px 0 0;
+}
+
+.filter-header:active { cursor: grabbing; }
+
+.filter-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
   color: #1c1c1e;
+  pointer-events: none; 
+}
+
+.filter-clear-btn {
+  background: none;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-size: 0.9rem;
+  color: #007aff;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.ios-button-secondary:hover {
-  background: rgba(142, 142, 147, 0.2);
+.filter-clear-btn:hover { text-decoration: underline; }
+
+.filter-body {
+  padding: 20px;
+}
+
+.filter-group { margin-bottom: 12px; }
+
+.filter-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.tracker-actions-wrapper {
+  position: relative;
+  display: flex;
+  gap: 12px;
 }
 
 /* =========================================
-   8. METRIC CARDS (OVERVIEW / VIEW TABS)
+   7. METRICS CARDS (Overview & View Tabs)
    ========================================= */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+  width: 100%;
 }
 
 .metric-card {
@@ -374,8 +477,8 @@
   border-radius: 16px;
   padding: 16px;
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  border: 0.5px solid rgba(60, 60, 67, 0.08);
+  box-shadow: none;
+  border: 1px solid rgba(60, 60, 67, 0.08);
 }
 
 .metric-card h4 {
@@ -400,35 +503,42 @@
 .metric-card.primary .metric-value { color: #007aff; }
 
 .sprint-selector-container {
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 12px;
+  background: transparent;
+  padding: 16px 0;
   margin-bottom: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  border: 0.5px solid rgba(60, 60, 67, 0.08);
 }
 
-.sprint-selector-container h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: #1c1c1e;
-}
+.sprint-selector-container h3 { margin: 0; font-size: 1rem; color: #1c1c1e; }
+.sprint-selector-container select { flex: 1; font-size: 1rem; padding: 8px; max-width: 400px; }
 
-.sprint-selector-container select {
-  flex: 1;
-  font-size: 1rem;
-  padding: 8px;
+@media (max-width: 768px) {
+  .sprint-tracker-view { padding: 1rem; width: 100%; }
+  .master-wrapper-card { padding: 16px; }
+  .tracker-header-row { flex-direction: column; align-items: flex-start; }
+  .ios-button, .btn-gradient { width: 100%; text-align: center; }
+  .tracker-tabs { flex-direction: column; gap: 8px; }
+  .filter-panel { width: 90vw; left: 5vw !important; top: 10vh !important; }
 }
 
 /* =========================================
-   9. RESPONSIVE MEDIA QUERIES
+   10. GLOBAL TABLE STRETCH FIX
    ========================================= */
-@media (max-width: 768px) {
-  .sprint-tracker-view { padding: 1rem; }
-  .tracker-header-row { flex-direction: column; align-items: flex-start; }
-  .ios-button { width: 100%; text-align: center; }
-  .tracker-tabs { width: 100%; display: flex; flex-direction: column; }
+/* Forces all tables inside the Sprint Tracker to maximize card width */
+.sprint-tracker-view .ios-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+/* Ensure the wrapper cards in Overview and View tabs stretch fully */
+.sprint-tracker-view .ios-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Optional: Give the task name/sprint columns a bit more priority on stretch */
+.sprint-tracker-view .ios-table th:nth-child(2) {
+  min-width: 250px;
 }

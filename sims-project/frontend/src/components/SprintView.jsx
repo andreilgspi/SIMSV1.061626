@@ -20,7 +20,6 @@ const SprintView = () => {
       const allTasks = data || [];
       setTasks(allTasks);
       
-      // Extract unique sprint names
       const sprints = [...new Set(allTasks.map(t => t.sprint).filter(Boolean))];
       setAvailableSprints(sprints);
       if (sprints.length > 0) setSelectedSprint(sprints[0]);
@@ -32,10 +31,8 @@ const SprintView = () => {
     }
   };
 
-  // Filter tasks for the selected sprint
   const filteredTasks = tasks.filter(t => t.sprint === selectedSprint);
 
-  // Calculations for the selected sprint
   const totalTasks = filteredTasks.length;
   const completed = filteredTasks.filter(t => t.status === 'Done').length;
   const inProgress = filteredTasks.filter(t => t.status === 'In Progress').length;
@@ -104,29 +101,33 @@ const SprintView = () => {
       {/* Read Only Table for the specific sprint */}
       <div className="ios-card" style={{ marginTop: '24px' }}>
         <h3 style={{ padding: '16px', margin: 0, borderBottom: '1px solid #eee', background: '#f8f8fa' }}>SPRINT BREAKDOWN</h3>
-        <div className="table-responsive">
-          <table className="ios-table">
+        
+        {/* ADDED: Scrollable Container and Tracker Table classes */}
+        <div className="scrollable-table-container" style={{ border: 'none' }}>
+          <table className="ios-table tracker-table">
             <thead>
               <tr>
-                <th style={{ width: '50px' }}>#</th>
-                <th>Task Name</th>
-                <th>Assignee(s)</th>
-                <th>Phase</th>
-                <th style={{ textAlign: 'center' }}>Story Pts</th>
-                <th>Priority</th>
-                <th>Status</th>
+                {/* ADDED: Explicit Alignments */}
+                <th style={{ width: '50px', textAlign: 'center' }}>#</th>
+                <th style={{ textAlign: 'left' }}>Task Name</th>
+                <th style={{ width: '200px', textAlign: 'left' }}>Assignee(s)</th>
+                <th style={{ width: '150px', textAlign: 'left' }}>Phase</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Story Pts</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>Priority</th>
+                <th style={{ width: '130px', textAlign: 'center' }}>Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredTasks.map((task, index) => (
                 <tr key={task.id}>
-                  <td style={{ color: '#8e8e93' }}>{index + 1}</td>
-                  <td style={{ fontWeight: 500 }}>{task.task_name || '—'}</td>
-                  <td>{task.assignees ? task.assignees.join(', ') : '—'}</td>
-                  <td>{task.phase}</td>
+                  {/* ADDED: Explicit Alignments matching headers */}
+                  <td style={{ textAlign: 'center', color: '#8e8e93' }}>{index + 1}</td>
+                  <td style={{ textAlign: 'left', fontWeight: 500 }}>{task.task_name || '—'}</td>
+                  <td style={{ textAlign: 'left' }}>{task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '—'}</td>
+                  <td style={{ textAlign: 'left' }}>{task.phase}</td>
                   <td style={{ textAlign: 'center' }}><span className="badge-count">{task.story_points}</span></td>
-                  <td><span className={`ios-badge priority-${(task.priority || 'Medium').toLowerCase()}`}>{task.priority}</span></td>
-                  <td><span className={`ios-badge status-${(task.status || 'To Do').toLowerCase().replace(' ', '-')}`}>{task.status}</span></td>
+                  <td style={{ textAlign: 'center' }}><span className={`ios-badge priority-${(task.priority || 'Medium').toLowerCase()}`}>{task.priority}</span></td>
+                  <td style={{ textAlign: 'center' }}><span className={`ios-badge status-${(task.status || 'To Do').toLowerCase().replace(' ', '-')}`}>{task.status}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -22,7 +22,6 @@ const SprintOverview = () => {
     }
   };
 
-  // --- Calculations ---
   const totalTasks = tasks.length;
   const totalDone = tasks.filter(t => t.status === 'Done').length;
   const inProgress = tasks.filter(t => t.status === 'In Progress').length;
@@ -34,7 +33,6 @@ const SprintOverview = () => {
   const ptsCompleted = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.story_points || 0), 0);
   const ptsRemaining = totalStoryPts - ptsCompleted;
 
-  // Group tasks by sprint for the historical summary table
   const sprintsSummary = tasks.reduce((acc, task) => {
     const sprintName = task.sprint || 'Unassigned';
     if (!acc[sprintName]) {
@@ -101,29 +99,32 @@ const SprintOverview = () => {
       </div>
 
       <div className="ios-card">
-        <div className="table-responsive">
-          <table className="ios-table">
+        {/* ADDED: Scrollable Container and Tracker Table classes */}
+        <div className="scrollable-table-container" style={{ border: 'none' }}>
+          <table className="ios-table tracker-table">
             <thead>
               <tr>
-                <th>Sprint</th>
-                <th style={{textAlign: 'center'}}>Total</th>
-                <th style={{textAlign: 'center'}}>Done</th>
-                <th style={{textAlign: 'center'}}>% Done</th>
-                <th style={{textAlign: 'center'}}>Velocity</th>
-                <th style={{textAlign: 'center'}}>Blocked</th>
-                <th style={{textAlign: 'center'}}>Status</th>
+                {/* ADDED: Explicit Alignments */}
+                <th style={{ textAlign: 'left' }}>Sprint</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Total</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Done</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>% Done</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Velocity</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Blocked</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
               </tr>
             </thead>
             <tbody>
               {Object.values(sprintsSummary).map(sprint => (
                 <tr key={sprint.name}>
-                  <td style={{fontWeight: 500}}>{sprint.name}</td>
-                  <td style={{textAlign: 'center'}}>{sprint.total}</td>
-                  <td style={{textAlign: 'center'}}>{sprint.done}</td>
-                  <td style={{textAlign: 'center'}}>{Math.round((sprint.done / (sprint.total || 1)) * 100)}%</td>
-                  <td style={{textAlign: 'center'}}>{sprint.donePts}</td>
-                  <td style={{textAlign: 'center', color: sprint.blocked > 0 ? '#ff3b30' : 'inherit'}}>{sprint.blocked}</td>
-                  <td style={{textAlign: 'center'}}><span className="ios-badge status-in-progress">Active</span></td>
+                  {/* ADDED: Explicit Alignments matching headers */}
+                  <td style={{ textAlign: 'left', fontWeight: 500 }}>{sprint.name}</td>
+                  <td style={{ textAlign: 'center' }}>{sprint.total}</td>
+                  <td style={{ textAlign: 'center' }}>{sprint.done}</td>
+                  <td style={{ textAlign: 'center' }}>{Math.round((sprint.done / (sprint.total || 1)) * 100)}%</td>
+                  <td style={{ textAlign: 'center' }}>{sprint.donePts}</td>
+                  <td style={{ textAlign: 'center', color: sprint.blocked > 0 ? '#ff3b30' : 'inherit' }}>{sprint.blocked}</td>
+                  <td style={{ textAlign: 'center' }}><span className="ios-badge status-in-progress">Active</span></td>
                 </tr>
               ))}
             </tbody>

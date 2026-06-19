@@ -54,16 +54,26 @@ function Dashboard({ tasks, selectedProject }) {
     const plannedCompletion = totalDuration > 0 ? (totalElapsedDays / totalDuration) * 100 : 0;
     
     let scheduleStatus = 'On Track';
-    if (avgPercentComplete > plannedCompletion + 10) scheduleStatus = 'Ahead';
-    else if (avgPercentComplete < plannedCompletion - 10) scheduleStatus = 'At Risk';
-    else if (avgPercentComplete < plannedCompletion - 25) scheduleStatus = 'Behind';
+    let statusColor = '#34c759';
+    if (avgPercentComplete > plannedCompletion + 10) {
+      scheduleStatus = 'Ahead';
+      statusColor = '#34c759';
+    } else if (avgPercentComplete < plannedCompletion - 10) {
+      scheduleStatus = 'At Risk';
+      statusColor = '#ff9500';
+    } else if (avgPercentComplete < plannedCompletion - 25) {
+      scheduleStatus = 'Behind';
+      statusColor = '#ff3b30';
+    }
     
     setMetrics({
       projectTitle: selectedProject ? selectedProject.name : 'SIMS PROJECT DASHBOARD',
       subDescription: selectedProject?.description || 'Smart Inventory Management System | Live Project Tracker',
-      projectStart: projectStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }),
-      projectEnd: projectEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }),
+      // FULL DATE FORMAT - Month Day, Year
+      projectStart: projectStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      projectEnd: projectEnd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       scheduleStatus,
+      statusColor,
       totalElapsedDays: Math.max(0, totalElapsedDays),
       workingDaysElapsed,
       approxHoursRendered,
@@ -112,10 +122,18 @@ function Dashboard({ tasks, selectedProject }) {
       avg_percent_complete: p.total_tasks > 0 
         ? Math.round((p.complete_count / p.total_tasks) * 100) 
         : 0,
-      completion_rate: Math.round(p.total_percent / p.total_tasks)
+      completion_rate: Math.round(p.total_percent / p.total_tasks),
+      // FULL DATE FORMAT for phase dates
+      phase_start_formatted: new Date(p.phase_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      phase_end_formatted: new Date(p.phase_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     }));
     
     setPhases(phasesArray);
+  };
+
+  const getPhaseColor = (phaseName, index) => {
+    const colors = ['#007aff', '#5856d6', '#ff2d55', '#ff9500', '#34c759', '#30b0c0', '#af52de'];
+    return colors[index % colors.length];
   };
 
   if (!metrics && tasks.length === 0) {
@@ -131,98 +149,95 @@ function Dashboard({ tasks, selectedProject }) {
 
   if (!metrics) return <div className="loading">Loading dashboard...</div>;
 
-  // Get phase color
-  const getPhaseColor = (phaseName, index) => {
-    const colors = ['#007aff', '#5856d6', '#ff2d55', '#ff9500', '#34c759', '#30b0c0', '#af52de'];
-    return colors[index % colors.length];
-  };
+  // Calculate donut chart data
+  const total = metrics.totalTasks || 1;
+  const completePct = (metrics.completeTasks / total) * 100;
+  const inProgressPct = (metrics.inProgressTasks / total) * 100;
+  const notStartedPct = (metrics.notStartedTasks / total) * 100;
+
+  // SVG donut chart parameters
+  const radius = 40;
+  const center = 50;
+  const circumference = 2 * Math.PI * radius;
+
+  // Calculate stroke-dasharray and offset for each segment
+  const completeOffset = 0;
+  const completeDash = (completePct / 100) * circumference;
+  const inProgressOffset = completeDash;
+  const inProgressDash = (inProgressPct / 100) * circumference;
+  const notStartedOffset = completeDash + inProgressDash;
+  const notStartedDash = (notStartedPct / 100) * circumference;
 
   return (
     <div className="dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1>{metrics.projectTitle}</h1>
-          <p>{metrics.subDescription}</p>
-        </div>
-        <div className="date-started">
-          Started: {metrics.projectStart}
-        </div>
-      </div>
-
-      {/* Hero Section - Two column layout like image */}
-      <div className="hero-section">
-        {/* Timeline & Schedule Card */}
-        <div className="card">
-          <h3>TIMELINE & SCHEDULE</h3>
-          <div className="timeline-grid-2col">
-            <div className="timeline-item">
-              <span className="label">Project Start</span>
-              <span className="value">{metrics.projectStart}</span>
-            </div>
-            <div className="timeline-item">
-              <span className="label">Project End</span>
-              <span className="value">{metrics.projectEnd}</span>
-            </div>
-            <div className="timeline-item">
-              <span className="label">Schedule Status</span>
-              <span className={`value status-${metrics.scheduleStatus.toLowerCase().replace(' ', '')}`}>
-                {metrics.scheduleStatus}
-              </span>
-            </div>
-            <div className="timeline-item">
-              <span className="label">Total Elapsed (Days)</span>
-              <span className="value">{metrics.totalElapsedDays}</span>
-            </div>
-            <div className="timeline-item">
-              <span className="label">Working Days Elapsed</span>
-              <span className="value">{metrics.workingDaysElapsed}</span>
-            </div>
-            <div className="timeline-item">
-              <span className="label">Approx. Hours Rendered</span>
-              <span className="value">{metrics.approxHoursRendered}</span>
-            </div>
+      {/* Timeline & Schedule - ENHANCED */}
+      <div className="timeline-section">
+        <h2 className="section-title">TIMELINE & SCHEDULE</h2>
+        <div className="timeline-grid">
+          <div className="timeline-item">
+            <span className="timeline-value blue">{metrics.projectStart}</span>
+            <span className="timeline-label">PROJECT START</span>
           </div>
-        </div>
-
-        {/* Task Counts & Completion Card */}
-        <div className="card">
-          <h3>TASK COUNTS & COMPLETION</h3>
-          <div className="stats-grid-2col">
-            <div className="stat-item">
-              <span className="stat-number">{metrics.totalTasks}</span>
-              <span className="stat-label">Total Tasks</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{metrics.completeTasks}</span>
-              <span className="stat-label">Complete</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{metrics.inProgressTasks}</span>
-              <span className="stat-label">In Progress</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{metrics.notStartedTasks}</span>
-              <span className="stat-label">Not Started</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{metrics.completionRate}%</span>
-              <span className="stat-label">Completion Rate</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{metrics.overdueTasks}</span>
-              <span className="stat-label">Overdue Tasks</span>
-            </div>
+          <div className="timeline-item">
+            <span className="timeline-value green">{metrics.projectEnd}</span>
+            <span className="timeline-label">PROJECT END</span>
+          </div>
+          <div className="timeline-item">
+            <span className="timeline-value status-badge" style={{ backgroundColor: metrics.statusColor }}>
+              {metrics.scheduleStatus}
+            </span>
+            <span className="timeline-label">SCHEDULE STATUS</span>
+          </div>
+          <div className="timeline-item">
+            <span className="timeline-value orange">{metrics.totalElapsedDays}</span>
+            <span className="timeline-label">TOTAL ELAPSED (DAYS)</span>
+          </div>
+          <div className="timeline-item">
+            <span className="timeline-value purple">{metrics.workingDaysElapsed}</span>
+            <span className="timeline-label">WORKING DAYS ELAPSED</span>
+          </div>
+          <div className="timeline-item">
+            <span className="timeline-value pink">{metrics.approxHoursRendered}</span>
+            <span className="timeline-label">APPROX. HOURS RENDERED</span>
           </div>
         </div>
       </div>
 
-      {/* Phase Summary Table */}
-      <div className="card">
-        <h3>PHASE SUMMARY</h3>
-        {phases.length === 0 ? (
-          <p className="no-phases-message">No phases found for this project.</p>
-        ) : (
+      {/* Task Counts & Completion - ENHANCED */}
+      <div className="task-section">
+        <h2 className="section-title">TASK COUNTS & COMPLETION</h2>
+        <div className="task-counts-grid">
+          <div className="task-count-item">
+            <span className="task-count-number">{metrics.totalTasks}</span>
+            <span className="task-count-label">TOTAL TASKS</span>
+          </div>
+          <div className="task-count-item">
+            <span className="task-count-number complete">{metrics.completeTasks}</span>
+            <span className="task-count-label">COMPLETE</span>
+          </div>
+          <div className="task-count-item">
+            <span className="task-count-number in-progress">{metrics.inProgressTasks}</span>
+            <span className="task-count-label">IN PROGRESS</span>
+          </div>
+          <div className="task-count-item">
+            <span className="task-count-number not-started">{metrics.notStartedTasks}</span>
+            <span className="task-count-label">NOT STARTED</span>
+          </div>
+          <div className="task-count-item">
+            <span className="task-count-number highlight">{metrics.completionRate}%</span>
+            <span className="task-count-label">COMPLETION RATE</span>
+          </div>
+          <div className="task-count-item">
+            <span className="task-count-number warning">{metrics.overdueTasks}</span>
+            <span className="task-count-label">OVERDUE TASKS</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase Summary Section */}
+      <div className="section">
+        <h2 className="section-title">PHASE SUMMARY</h2>
+        <div className="table-wrapper">
           <table className="phase-table">
             <thead>
               <tr>
@@ -239,134 +254,155 @@ function Dashboard({ tasks, selectedProject }) {
               </tr>
             </thead>
             <tbody>
-              {phases.map((phase, idx) => (
-                <tr key={idx}>
-                  <td>{phase.phase}</td>
-                  <td>{phase.total_tasks}</td>
-                  <td>{phase.complete_count}</td>
-                  <td>{phase.in_progress_count}</td>
-                  <td>{phase.not_started_count}</td>
-                  <td>{phase.avg_percent_complete}%</td>
-                  <td>{phase.completion_rate}%</td>
-                  <td>{new Date(phase.phase_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</td>
-                  <td>{new Date(phase.phase_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</td>
-                  <td>
-                    <div className="progress-bar-mini">
-                      <div 
-                        className="progress-bar-mini-fill" 
-                        style={{ 
-                          width: `${phase.completion_rate}%`,
-                          backgroundColor: getPhaseColor(phase.phase, idx)
-                        }}
-                      ></div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {phases.map((phase, idx) => {
+                const color = getPhaseColor(phase.phase, idx);
+                return (
+                  <tr key={idx}>
+                    <td className="phase-name">{phase.phase}</td>
+                    <td>{phase.total_tasks}</td>
+                    <td className="complete-text">{phase.complete_count}</td>
+                    <td className="progress-text">{phase.in_progress_count}</td>
+                    <td className="notstarted-text">{phase.not_started_count}</td>
+                    <td>{phase.avg_percent_complete}%</td>
+                    <td className="completion-text">{phase.completion_rate}%</td>
+                    <td>{phase.phase_start_formatted}</td>
+                    <td>{phase.phase_end_formatted}</td>
+                    <td>
+                      <div className="progress-bar-mini">
+                        <div 
+                          className="progress-bar-mini-fill" 
+                          style={{ 
+                            width: `${phase.completion_rate}%`,
+                            backgroundColor: color
+                          }}
+                        ></div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        )}
+        </div>
       </div>
 
-      {/* Charts Section - Three charts like image */}
-      <div className="charts-section">
+      {/* Charts Section */}
+      <div className="charts-row">
         {/* Task Status by Phase */}
         <div className="chart-card">
           <h3>Task Status by Phase</h3>
           <div className="chart-bars">
             {phases.map((phase, idx) => {
               const total = phase.total_tasks || 1;
-              const completePct = (phase.complete_count / total) * 100;
-              const inProgressPct = (phase.in_progress_count / total) * 100;
-              const notStartedPct = (phase.not_started_count / total) * 100;
-              const color = getPhaseColor(phase.phase, idx);
+              const completePct = Math.round((phase.complete_count / total) * 100);
+              const inProgressPct = Math.round((phase.in_progress_count / total) * 100);
+              const notStartedPct = Math.round((phase.not_started_count / total) * 100);
               
               return (
                 <div key={idx} className="chart-bar-row">
                   <span className="chart-bar-label">{phase.phase.replace('[P', 'P').replace(']', '')}</span>
                   <div className="chart-bar-track">
-                    <div 
-                      className="chart-bar-segment complete" 
-                      style={{ width: `${completePct}%`, backgroundColor: '#34c759' }}
-                    ></div>
-                    <div 
-                      className="chart-bar-segment in-progress" 
-                      style={{ width: `${inProgressPct}%`, backgroundColor: '#ff9500' }}
-                    ></div>
-                    <div 
-                      className="chart-bar-segment not-started" 
-                      style={{ width: `${notStartedPct}%`, backgroundColor: '#e9ecef' }}
-                    ></div>
+                    {completePct > 0 && (
+                      <div className="chart-bar-segment complete" style={{ width: `${completePct}%` }}></div>
+                    )}
+                    {inProgressPct > 0 && (
+                      <div className="chart-bar-segment in-progress" style={{ width: `${inProgressPct}%` }}></div>
+                    )}
+                    {notStartedPct > 0 && (
+                      <div className="chart-bar-segment not-started" style={{ width: `${notStartedPct}%` }}></div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
           <div className="chart-legend">
-            <span><span className="legend-dot" style={{ backgroundColor: '#34c759' }}></span> Complete</span>
-            <span><span className="legend-dot" style={{ backgroundColor: '#ff9500' }}></span> In Progress</span>
-            <span><span className="legend-dot" style={{ backgroundColor: '#e9ecef' }}></span> Not Started</span>
+            <span><span className="legend-dot complete"></span> Complete</span>
+            <span><span className="legend-dot in-progress"></span> In Progress</span>
+            <span><span className="legend-dot not-started"></span> Not Started</span>
           </div>
         </div>
 
-        {/* Overall Status Mix - Donut Chart */}
+        {/* Overall Status Mix - FIXED DONUT CHART */}
         <div className="chart-card">
           <h3>Overall Status Mix</h3>
           <div className="donut-chart-container">
             <div className="donut-chart">
               <svg viewBox="0 0 100 100" width="160" height="160">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#e9ecef" strokeWidth="16" />
-                {(() => {
-                  const total = metrics.totalTasks || 1;
-                  const completePct = (metrics.completeTasks / total) * 100;
-                  const inProgressPct = (metrics.inProgressTasks / total) * 100;
-                  const notStartedPct = (metrics.notStartedTasks / total) * 100;
-                  
-                  let currentAngle = 0;
-                  const segments = [
-                    { pct: completePct, color: '#34c759' },
-                    { pct: inProgressPct, color: '#ff9500' },
-                    { pct: notStartedPct, color: '#e9ecef' }
-                  ];
-                  
-                  return segments.filter(s => s.pct > 0).map((seg, i) => {
-                    const startAngle = currentAngle;
-                    const endAngle = currentAngle + (seg.pct / 100) * 360;
-                    currentAngle = endAngle;
-                    
-                    const startRad = (startAngle - 90) * Math.PI / 180;
-                    const endRad = (endAngle - 90) * Math.PI / 180;
-                    
-                    const x1 = 50 + 40 * Math.cos(startRad);
-                    const y1 = 50 + 40 * Math.sin(startRad);
-                    const x2 = 50 + 40 * Math.cos(endRad);
-                    const y2 = 50 + 40 * Math.sin(endRad);
-                    
-                    const largeArc = seg.pct > 50 ? 1 : 0;
-                    
-                    return (
-                      <path
-                        key={i}
-                        d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                        fill={seg.color}
-                      />
-                    );
-                  });
-                })()}
+                {/* Background circle */}
+                <circle cx="50" cy="50" r={radius} fill="none" stroke="#e9ecef" strokeWidth="16" />
+                
+                {/* Complete segment - Green */}
+                {completePct > 0 && (
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r={radius} 
+                    fill="none" 
+                    stroke="#34c759" 
+                    strokeWidth="16"
+                    strokeDasharray={`${completeDash} ${circumference}`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                )}
+                
+                {/* In Progress segment - Orange */}
+                {inProgressPct > 0 && (
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r={radius} 
+                    fill="none" 
+                    stroke="#ff9500" 
+                    strokeWidth="16"
+                    strokeDasharray={`${inProgressDash} ${circumference}`}
+                    strokeDashoffset={-completeDash}
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                )}
+                
+                {/* Not Started segment - Gray */}
+                {notStartedPct > 0 && (
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r={radius} 
+                    fill="none" 
+                    stroke="#e9ecef" 
+                    strokeWidth="16"
+                    strokeDasharray={`${notStartedDash} ${circumference}`}
+                    strokeDashoffset={-(completeDash + inProgressDash)}
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                )}
+                
+                {/* Center white circle */}
                 <circle cx="50" cy="50" r="28" fill="white" />
+                
+                {/* Center text */}
+                <text x="50" y="46" textAnchor="middle" fontSize="16" fontWeight="700" fill="#1c1c1e">
+                  {metrics.completionRate}%
+                </text>
+                <text x="50" y="60" textAnchor="middle" fontSize="8" fill="#8e8e93" fontWeight="500">
+                  Complete
+                </text>
               </svg>
             </div>
             <div className="donut-legend">
               <div className="donut-legend-item">
-                <span className="legend-dot" style={{ backgroundColor: '#34c759' }}></span>
+                <span className="legend-dot complete"></span>
                 <span className="legend-label">Complete ({metrics.completeTasks})</span>
               </div>
               <div className="donut-legend-item">
-                <span className="legend-dot" style={{ backgroundColor: '#ff9500' }}></span>
+                <span className="legend-dot in-progress"></span>
                 <span className="legend-label">In Progress ({metrics.inProgressTasks})</span>
               </div>
               <div className="donut-legend-item">
-                <span className="legend-dot" style={{ backgroundColor: '#e9ecef' }}></span>
+                <span className="legend-dot not-started"></span>
                 <span className="legend-label">Not Started ({metrics.notStartedTasks})</span>
               </div>
             </div>

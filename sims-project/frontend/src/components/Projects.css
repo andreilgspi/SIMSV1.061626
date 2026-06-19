@@ -7,7 +7,217 @@
   margin: 0 auto;
   transition: all 0.3s ease;
 }
+/* ========== PROJECTS GLOBAL HEADER - STACKED LAYOUT ========== */
+.projects-global-header {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid rgba(60, 60, 67, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  padding: 0.5rem 2rem 0;
+}
 
+/* Top row - Brand on left, Project centered */
+.projects-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0 0.5rem 0;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+}
+
+.projects-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #007aff, #5856d6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  letter-spacing: -0.5px;
+}
+
+.projects-current-project {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(0, 122, 255, 0.06);
+  padding: 0.4rem 1.5rem 0.4rem 1rem;
+  border-radius: 24px;
+  border: 0.5px solid rgba(0, 122, 255, 0.1);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.project-indicator {
+  font-size: 0.85rem;
+  color: #007aff;
+  font-weight: 300;
+}
+
+.project-name {
+  font-weight: 700;
+  color: #1c1c1e;
+  font-size: 1.4rem;
+  letter-spacing: -0.3px;
+}
+
+.project-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 2s infinite;
+  flex-shrink: 0;
+}
+
+/* Placeholder to maintain space on the right */
+.projects-header-spacer {
+  flex: 0 0 auto;
+  width: 120px; /* Match approximate width of brand */
+  visibility: hidden;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
+/* Bottom row - Navigation - CENTERED */
+.projects-header-nav {
+  padding: 0.5rem 0 0.75rem 0;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.projects-nav-links {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.projects-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #8e8e93;
+  text-decoration: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.projects-nav-link .nav-icon {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.projects-nav-link:hover {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.projects-nav-link.active {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.projects-nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: #007aff;
+  border-radius: 3px;
+}
+
+/* ========== RESPONSIVE FOR HEADER ========== */
+@media (max-width: 768px) {
+  .projects-global-header {
+    padding: 0.5rem 1rem 0;
+  }
+  
+  .projects-header-top {
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: center;
+    position: relative;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0.5rem 0 0.25rem 0;
+  }
+  
+  .projects-brand {
+    font-size: 1.2rem;
+    flex: 0 0 auto;
+  }
+  
+  .projects-current-project {
+    position: relative;
+    left: auto;
+    transform: none;
+    align-self: center;
+    padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+    order: 3;
+    flex: 0 0 auto;
+    border-radius: 20px;
+  }
+  
+  .projects-header-spacer {
+    display: none;
+  }
+  
+  .project-name {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  
+  .project-status-dot {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .project-indicator {
+    font-size: 0.7rem;
+  }
+  
+  .projects-nav-links {
+    flex-wrap: wrap;
+    gap: 0.15rem;
+    justify-content: center;
+  }
+  
+  .projects-nav-link {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+  }
+  
+  .projects-nav-link .nav-icon {
+    font-size: 0.7rem;
+  }
+  
+  .projects-nav-link.active::after {
+    bottom: -0.3rem;
+    width: 16px;
+    height: 2px;
+  }
+}
 /* ========== LEFT SIDEBAR - WIDER ========== */
 .projects-sidebar {
   flex: 0 0 580px;
@@ -1124,6 +1334,203 @@
 
 .btn-save:hover {
   background: #005fc9;
+}
+
+/* ========== PROJECT DETAILS IMPROVEMENTS ========== */
+.project-details-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1c1c1e;
+  margin: 0;
+}
+
+.project-details-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.project-description-text {
+  font-size: 0.9rem;
+  color: #6c6c70;
+  font-weight: 400;
+}
+
+/* Developer item improvements */
+.developer-item .developer-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1c1c1e;
+}
+
+/* Stats preview improvements */
+.stat-preview-item {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.stat-preview-item:hover {
+  background: #f0f4ff;
+  transform: translateY(-2px);
+}
+
+.stat-preview-number {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #007aff, #5856d6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stat-preview-label {
+  font-size: 0.6rem;
+  color: #8e8e93;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Project header improvements */
+.project-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 1.25rem;
+  border-bottom: 0.5px solid rgba(60, 60, 67, 0.08);
+  gap: 1rem;
+}
+
+.project-details-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  width: 100%;
+}
+
+/* Developer avatar in details */
+.developer-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.developer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8f9fa;
+  padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.developer-item:hover {
+  background: #eef2ff;
+}
+
+/* Make date items more compact */
+.date-item {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+}
+
+.date-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.15rem;
+}
+
+.date-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+/* Project description section */
+.project-description-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.project-description-section h4 {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.project-description-section p {
+  color: #1c1c1e;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Developers section header */
+.project-developers-section h4 {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Select button improvement */
+.btn-select-project {
+  padding: 0.4rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1.5px solid #007aff;
+  background: transparent;
+  color: #007aff;
+  min-width: 120px;
+}
+
+.btn-select-project:hover {
+  background: rgba(0, 122, 255, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15);
+}
+
+.btn-select-project.selected {
+  background: #34c759;
+  color: white;
+  border-color: #34c759;
+}
+
+.btn-select-project.selected:hover {
+  background: #28a745;
+  border-color: #28a745;
+  box-shadow: 0 2px 8px rgba(52, 199, 89, 0.25);
 }
 
 /* ========== RESPONSIVE ========== */

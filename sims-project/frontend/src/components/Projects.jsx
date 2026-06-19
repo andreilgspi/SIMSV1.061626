@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import './Projects.css';
-
 
 function Projects({ projects, selectedProject, onSelectProject, fetchProjects }) {
   const [isCreating, setIsCreating] = useState(false);
@@ -98,26 +98,19 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     const start = new Date(project.start_date);
     const end = new Date(project.end_date);
     
-    // If project hasn't started yet
     if (today < start) return 'Ready';
-    
-    // If project is completed
     if (today > end) return 'Done';
     
-    // Calculate progress
     const totalDuration = end - start;
     const elapsed = today - start;
     const progress = (elapsed / totalDuration) * 100;
     
-    // Get task completion rate
     const tasks = projectTasks[project.id] || [];
     const totalTasks = tasks.length;
     if (totalTasks === 0) return 'On Track';
     
     const completedTasks = tasks.filter(t => t.status === 'Complete').length;
     const completionRate = (completedTasks / totalTasks) * 100;
-    
-    // Determine status based on schedule vs actual progress
     const difference = completionRate - progress;
     
     if (difference >= 10) return 'On Track';
@@ -155,7 +148,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     setNewDeveloper(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle avatar file upload
   const handleAvatarUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -371,7 +363,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   };
 
   const handleProjectClick = (project) => {
-    // Just preview the project, don't select it yet
     setPreviewProject(project);
   };
 
@@ -429,535 +420,583 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     }
   };
 
-  // Determine which project to display (preview or selected)
   const displayProject = previewProject || selectedProject;
 
-  return (
-    <div className={`projects-container ${isCollapsed ? 'collapsed' : ''}`}>
-      {/* Left Sidebar */}
-      <div className="projects-sidebar">
-        <button 
-          className="collapse-toggle"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? '▶' : '◀'}
-        </button>
-
-        {!isCollapsed ? (
-          <>
-            <div className="projects-header">
-              <div className="view-toggle">
-                <button 
-                  className={`view-toggle-btn ${viewMode === 'projects' ? 'active' : ''}`}
-                  onClick={() => setViewMode('projects')}
-                >
-                  Projects
-                </button>
-                <button 
-                  className={`view-toggle-btn ${viewMode === 'developers' ? 'active' : ''}`}
-                  onClick={() => setViewMode('developers')}
-                >
-                  Developers
-                </button>
-              </div>
-              <div className="header-actions">
-                <button 
-                  ref={buttonRef}
-                  className="btn-add"
-                  onClick={handleCreateButtonClick}
-                >
-                  + New
-                </button>
-
-                {showCreateMenu && (
-                  <div ref={menuRef} className="create-menu">
-                    <button 
-                      className="create-menu-item"
-                      onClick={() => handleMenuItemClick('project')}
-                    >
-                      <span className="menu-icon"></span>
-                      Create New Project
-                    </button>
-                    <button 
-                      className="create-menu-item"
-                      onClick={() => handleMenuItemClick('developer')}
-                    >
-                      <span className="menu-icon"></span>
-                      Add New Developer
-                    </button>
-                  </div>
-                )}
-              </div>
+  // Projects Header Component with stacked layout - NO EMOJIS
+  const ProjectsHeader = () => {
+    return (
+      <div className="projects-global-header">
+        <div className="projects-header-top">
+          <div className="projects-brand">IntelliTrack</div>
+          {selectedProject && (
+            <div className="projects-current-project">
+              <span className="project-name">{selectedProject.name}</span>
+              <span 
+                className="project-status-dot"
+                style={{ backgroundColor: getStatusColor(calculateScheduleStatus(selectedProject)) }}
+              ></span>
             </div>
+          )}
+        </div>
+        <div className="projects-header-nav">
+          <div className="projects-nav-links">
+            <Link to="/projects" className="projects-nav-link active">
+              <span className="nav-icon">▣</span>
+              Projects
+            </Link>
+            <Link to="/" className="projects-nav-link">
+              <span className="nav-icon">◇</span>
+              Dashboard
+            </Link>
+            <Link to="/workbook" className="projects-nav-link">
+              <span className="nav-icon">▣</span>
+              Workbook
+            </Link>
+            <Link to="/milestones" className="projects-nav-link">
+              <span className="nav-icon">◈</span>
+              Milestones
+            </Link>
+            <Link to="/sprint-tracker" className="projects-nav-link">
+              <span className="nav-icon">▶</span>
+              Sprint Tracker
+            </Link>
+            
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-            {/* Create Modal */}
-            {isCreating && (
-              <div className="modal-overlay">
-                <div className="modal">
-                  <h3>{createType === 'project' ? 'Create New Project' : 'Add New Developer'}</h3>
-                  <form onSubmit={createType === 'project' ? handleCreateProject : handleAddDeveloper}>
-                    {createType === 'project' ? (
-                      <>
-                        <div className="form-grid">
-                          <div className="form-group full-width">
-                            <label>Project Name *</label>
-                            <input 
-                              type="text" 
-                              name="name" 
-                              value={newProject.name} 
-                              onChange={handleInputChange} 
-                              required 
-                              placeholder="Enter project name"
-                            />
-                          </div>
-                          <div className="form-group full-width">
-                            <label>Description</label>
-                            <textarea 
-                              name="description" 
-                              value={newProject.description} 
-                              onChange={handleInputChange} 
-                              rows="3"
-                              placeholder="Brief description of the project"
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label>Start Date</label>
-                            <input 
-                              type="date" 
-                              name="start_date" 
-                              value={newProject.start_date} 
-                              onChange={handleInputChange} 
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label>End Date</label>
-                            <input 
-                              type="date" 
-                              name="end_date" 
-                              value={newProject.end_date} 
-                              onChange={handleInputChange} 
-                            />
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="form-grid">
-                          <div className="form-group full-width">
-                            <label>Developer Name *</label>
-                            <input 
-                              type="text" 
-                              name="name" 
-                              value={newDeveloper.name} 
-                              onChange={handleDeveloperInputChange} 
-                              required 
-                              placeholder="Enter full name"
-                            />
-                          </div>
-                          <div className="form-group full-width">
-                            <label>Email</label>
-                            <input 
-                              type="email" 
-                              name="email" 
-                              value={newDeveloper.email} 
-                              onChange={handleDeveloperInputChange} 
-                              placeholder="developer@example.com"
-                            />
-                          </div>
-                          <div className="form-group full-width">
-                            <label>Role</label>
-                            <input 
-                              type="text" 
-                              name="role" 
-                              value={newDeveloper.role} 
-                              onChange={handleDeveloperInputChange} 
-                              placeholder="e.g., Frontend Developer"
-                            />
-                          </div>
-                          <div className="form-group full-width">
-                            <label>Profile Picture</label>
-                            <div className="avatar-upload-simple">
-                              {avatarPreview ? (
-                                <div className="avatar-preview-simple">
-                                  <img src={avatarPreview} alt="Avatar preview" />
-                                  <button 
-                                    type="button" 
-                                    className="avatar-remove-simple"
-                                    onClick={handleRemoveAvatar}
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="avatar-upload-box">
-                                  <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleAvatarUpload}
-                                    id="avatar-simple-upload"
-                                  />
-                                  <label htmlFor="avatar-simple-upload" className="avatar-upload-label">
-                                    <span className="upload-icon">📷</span>
-                                    <span>Click to upload image</span>
-                                    <small>JPG, PNG, GIF (max 5MB)</small>
-                                  </label>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <div className="modal-actions">
-                      <button type="button" className="btn-cancel" onClick={() => {
-                        setIsCreating(false);
-                        setShowCreateMenu(false);
-                        setAvatarPreview(null);
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = '';
-                        }
-                      }}>Cancel</button>
-                      <button type="submit" className="btn-save">
-                        {createType === 'project' ? 'Create Project' : 'Add Developer'}
+  return (
+    <>
+      <ProjectsHeader />
+      <div className={`projects-container ${isCollapsed ? 'collapsed' : ''}`}>
+        {/* Left Sidebar */}
+        <div className="projects-sidebar">
+          <button 
+            className="collapse-toggle"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? '▸' : '◂'}
+          </button>
+
+          {!isCollapsed ? (
+            <>
+              <div className="projects-header">
+                <div className="view-toggle">
+                  <button 
+                    className={`view-toggle-btn ${viewMode === 'projects' ? 'active' : ''}`}
+                    onClick={() => setViewMode('projects')}
+                  >
+                    Projects
+                  </button>
+                  <button 
+                    className={`view-toggle-btn ${viewMode === 'developers' ? 'active' : ''}`}
+                    onClick={() => setViewMode('developers')}
+                  >
+                    Developers
+                  </button>
+                </div>
+                <div className="header-actions">
+                  <button 
+                    ref={buttonRef}
+                    className="btn-add"
+                    onClick={handleCreateButtonClick}
+                  >
+                    + New
+                  </button>
+
+                  {showCreateMenu && (
+                    <div ref={menuRef} className="create-menu">
+                      <button 
+                        className="create-menu-item"
+                        onClick={() => handleMenuItemClick('project')}
+                      >
+                        <span className="menu-icon">◆</span>
+                        Create New Project
+                      </button>
+                      <button 
+                        className="create-menu-item"
+                        onClick={() => handleMenuItemClick('developer')}
+                      >
+                        <span className="menu-icon">◉</span>
+                        Add New Developer
                       </button>
                     </div>
-                  </form>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Edit Modal */}
-            {isEditing && editingProject && (
-              <div className="modal-overlay">
-                <div className="modal">
-                  <h3>Edit Project</h3>
-                  <form onSubmit={handleUpdateProject}>
-                    <div className="form-grid">
-                      <div className="form-group full-width">
-                        <label>Project Name *</label>
-                        <input 
-                          type="text" 
-                          name="name" 
-                          value={editingProject.name} 
-                          onChange={handleEditInputChange} 
-                          required 
-                          placeholder="Enter project name"
-                        />
+              {/* Create Modal */}
+              {isCreating && (
+                <div className="modal-overlay">
+                  <div className="modal">
+                    <h3>{createType === 'project' ? 'Create New Project' : 'Add New Developer'}</h3>
+                    <form onSubmit={createType === 'project' ? handleCreateProject : handleAddDeveloper}>
+                      {createType === 'project' ? (
+                        <>
+                          <div className="form-grid">
+                            <div className="form-group full-width">
+                              <label>Project Name *</label>
+                              <input 
+                                type="text" 
+                                name="name" 
+                                value={newProject.name} 
+                                onChange={handleInputChange} 
+                                required 
+                                placeholder="Enter project name"
+                              />
+                            </div>
+                            <div className="form-group full-width">
+                              <label>Description</label>
+                              <textarea 
+                                name="description" 
+                                value={newProject.description} 
+                                onChange={handleInputChange} 
+                                rows="3"
+                                placeholder="Brief description of the project"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Start Date</label>
+                              <input 
+                                type="date" 
+                                name="start_date" 
+                                value={newProject.start_date} 
+                                onChange={handleInputChange} 
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>End Date</label>
+                              <input 
+                                type="date" 
+                                name="end_date" 
+                                value={newProject.end_date} 
+                                onChange={handleInputChange} 
+                              />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="form-grid">
+                            <div className="form-group full-width">
+                              <label>Developer Name *</label>
+                              <input 
+                                type="text" 
+                                name="name" 
+                                value={newDeveloper.name} 
+                                onChange={handleDeveloperInputChange} 
+                                required 
+                                placeholder="Enter full name"
+                              />
+                            </div>
+                            <div className="form-group full-width">
+                              <label>Email</label>
+                              <input 
+                                type="email" 
+                                name="email" 
+                                value={newDeveloper.email} 
+                                onChange={handleDeveloperInputChange} 
+                                placeholder="developer@example.com"
+                              />
+                            </div>
+                            <div className="form-group full-width">
+                              <label>Role</label>
+                              <input 
+                                type="text" 
+                                name="role" 
+                                value={newDeveloper.role} 
+                                onChange={handleDeveloperInputChange} 
+                                placeholder="e.g., Frontend Developer"
+                              />
+                            </div>
+                            <div className="form-group full-width">
+                              <label>Profile Picture</label>
+                              <div className="avatar-upload-simple">
+                                {avatarPreview ? (
+                                  <div className="avatar-preview-simple">
+                                    <img src={avatarPreview} alt="Avatar preview" />
+                                    <button 
+                                      type="button" 
+                                      className="avatar-remove-simple"
+                                      onClick={handleRemoveAvatar}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="avatar-upload-box">
+                                    <input
+                                      ref={fileInputRef}
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={handleAvatarUpload}
+                                      id="avatar-simple-upload"
+                                    />
+                                    <label htmlFor="avatar-simple-upload" className="avatar-upload-label">
+                                      <span className="upload-icon">🖼</span>
+                                      <span>Click to upload image</span>
+                                      <small>JPG, PNG, GIF (max 5MB)</small>
+                                    </label>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <div className="modal-actions">
+                        <button type="button" className="btn-cancel" onClick={() => {
+                          setIsCreating(false);
+                          setShowCreateMenu(false);
+                          setAvatarPreview(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
+                        }}>Cancel</button>
+                        <button type="submit" className="btn-save">
+                          {createType === 'project' ? 'Create Project' : 'Add Developer'}
+                        </button>
                       </div>
-                      <div className="form-group full-width">
-                        <label>Description</label>
-                        <textarea 
-                          name="description" 
-                          value={editingProject.description || ''} 
-                          onChange={handleEditInputChange} 
-                          rows="3"
-                          placeholder="Brief description of the project"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Status</label>
-                        <select 
-                          name="status" 
-                          value={editingProject.status} 
-                          onChange={handleEditInputChange}
-                        >
-                          {statusOptions.map(status => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label>End Date</label>
-                        <input 
-                          type="date" 
-                          name="end_date" 
-                          value={editingProject.end_date || ''} 
-                          onChange={handleEditInputChange} 
-                        />
-                      </div>
-                    </div>
-                    <div className="modal-actions">
-                      <button type="button" className="btn-cancel" onClick={() => {
-                        setIsEditing(false);
-                        setEditingProject(null);
-                      }}>Cancel</button>
-                      <button type="submit" className="btn-save">Update Project</button>
-                    </div>
-                  </form>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Content List */}
-            <div className="project-list">
-              {loading ? (
-                <div className="loading-text">Loading...</div>
-              ) : viewMode === 'projects' ? (
-                projects.map((project) => {
-                  const progress = getProjectProgress(project.id);
-                  const isSelected = selectedProject && selectedProject.id === project.id;
-                  const isPreview = previewProject && previewProject.id === project.id;
-                  const status = calculateScheduleStatus(project);
-                  
-                  return (
-                    <div 
-                      key={project.id} 
-                      className={`project-list-item ${isSelected ? 'selected' : ''} ${isPreview ? 'preview' : ''}`}
-                      onClick={() => handleProjectClick(project)}
-                    >
-                      <span className="project-item-name">{project.name}</span>
-                      <span 
-                        className="project-item-status"
-                        style={{ backgroundColor: getStatusColor(status) }}
+              {/* Edit Modal */}
+              {isEditing && editingProject && (
+                <div className="modal-overlay">
+                  <div className="modal">
+                    <h3>Edit Project</h3>
+                    <form onSubmit={handleUpdateProject}>
+                      <div className="form-grid">
+                        <div className="form-group full-width">
+                          <label>Project Name *</label>
+                          <input 
+                            type="text" 
+                            name="name" 
+                            value={editingProject.name} 
+                            onChange={handleEditInputChange} 
+                            required 
+                            placeholder="Enter project name"
+                          />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>Description</label>
+                          <textarea 
+                            name="description" 
+                            value={editingProject.description || ''} 
+                            onChange={handleEditInputChange} 
+                            rows="3"
+                            placeholder="Brief description of the project"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Status</label>
+                          <select 
+                            name="status" 
+                            value={editingProject.status} 
+                            onChange={handleEditInputChange}
+                          >
+                            {statusOptions.map(status => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>End Date</label>
+                          <input 
+                            type="date" 
+                            name="end_date" 
+                            value={editingProject.end_date || ''} 
+                            onChange={handleEditInputChange} 
+                          />
+                        </div>
+                      </div>
+                      <div className="modal-actions">
+                        <button type="button" className="btn-cancel" onClick={() => {
+                          setIsEditing(false);
+                          setEditingProject(null);
+                        }}>Cancel</button>
+                        <button type="submit" className="btn-save">Update Project</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Content List */}
+              <div className="project-list">
+                {loading ? (
+                  <div className="loading-text">Loading...</div>
+                ) : viewMode === 'projects' ? (
+                  projects.map((project) => {
+                    const progress = getProjectProgress(project.id);
+                    const isSelected = selectedProject && selectedProject.id === project.id;
+                    const isPreview = previewProject && previewProject.id === project.id;
+                    const status = calculateScheduleStatus(project);
+                    
+                    return (
+                      <div 
+                        key={project.id} 
+                        className={`project-list-item ${isSelected ? 'selected' : ''} ${isPreview ? 'preview' : ''}`}
+                        onClick={() => handleProjectClick(project)}
                       >
-                        {status}
-                      </span>
-                      <span className="project-item-dates">
-                        {project.start_date && (
-                          <span>{formatDate(project.start_date)}</span>
-                        )}
-                        {project.end_date && (
-                          <span> → {formatDate(project.end_date)}</span>
-                        )}
-                      </span>
-                      <div className="project-item-progress">
-                        <div className="progress-bar">
+                        <span className="project-item-name">{project.name}</span>
+                        <span 
+                          className="project-item-status"
+                          style={{ backgroundColor: getStatusColor(status) }}
+                        >
+                          {status}
+                        </span>
+                        <span className="project-item-dates">
+                          {project.start_date && (
+                            <span>{formatDate(project.start_date)}</span>
+                          )}
+                          {project.end_date && (
+                            <span> → {formatDate(project.end_date)}</span>
+                          )}
+                        </span>
+                        <div className="project-item-progress">
+                          <div className="progress-bar">
+                            <div 
+                              className="progress-fill" 
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                          <span className="progress-text">{progress}%</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  developers.map((developer) => (
+                    <div key={developer.id} className="developer-list-item">
+                      <div className="developer-item-content">
+                        <div className="developer-avatar-container">
+                          {getDeveloperAvatar(developer) ? (
+                            <img 
+                              src={developer.avatar} 
+                              alt={developer.name}
+                              className="developer-avatar-image"
+                            />
+                          ) : (
+                            <div 
+                              className="developer-avatar-initials"
+                              style={{ backgroundColor: getAvatarColor(developer.name) }}
+                            >
+                              {getInitials(developer.name)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="developer-info">
+                          <span className="developer-name">{developer.name}</span>
+                          {developer.role && (
+                            <span className="developer-role">{developer.role}</span>
+                          )}
+                          {developer.email && (
+                            <span className="developer-email">{developer.email}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="collapsed-content">
+              {projects.map((project) => {
+                const isSelected = selectedProject && selectedProject.id === project.id;
+                const progress = getProjectProgress(project.id);
+                const status = calculateScheduleStatus(project);
+                
+                return (
+                  <div 
+                    key={project.id} 
+                    className={`collapsed-project-item ${isSelected ? 'active' : 'inactive'}`}
+                    onClick={() => handleProjectClick(project)}
+                  >
+                    <div className="collapsed-project-initials">
+                      {getInitials(project.name)}
+                    </div>
+                    <div className="collapsed-project-name">
+                      {project.name}
+                    </div>
+                    <div className="collapsed-project-status-dot-container">
+                      <div 
+                        className="collapsed-project-status-dot"
+                        style={{ backgroundColor: getStatusColor(status) }}
+                      ></div>
+                    </div>
+                    {isSelected && (
+                      <div className="collapsed-selected-badge">●</div>
+                    )}
+                    {!isSelected && (
+                      <div className="collapsed-project-progress">
+                        <div className="collapsed-progress-bar">
                           <div 
-                            className="progress-fill" 
+                            className="collapsed-progress-fill" 
                             style={{ width: `${progress}%` }}
                           ></div>
                         </div>
-                        <span className="progress-text">{progress}%</span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                developers.map((developer) => (
-                  <div key={developer.id} className="developer-list-item">
-                    <div className="developer-item-content">
-                      <div className="developer-avatar-container">
-                        {getDeveloperAvatar(developer) ? (
-                          <img 
-                            src={developer.avatar} 
-                            alt={developer.name}
-                            className="developer-avatar-image"
-                          />
-                        ) : (
-                          <div 
-                            className="developer-avatar-initials"
-                            style={{ backgroundColor: getAvatarColor(developer.name) }}
-                          >
-                            {getInitials(developer.name)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="developer-info">
-                        <span className="developer-name">{developer.name}</span>
-                        {developer.role && (
-                          <span className="developer-role">{developer.role}</span>
-                        )}
-                        {developer.email && (
-                          <span className="developer-email">{developer.email}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="collapsed-content">
-            {projects.map((project) => {
-              const isSelected = selectedProject && selectedProject.id === project.id;
-              const progress = getProjectProgress(project.id);
-              const status = calculateScheduleStatus(project);
-              
-              return (
-                <div 
-                  key={project.id} 
-                  className={`collapsed-project-item ${isSelected ? 'active' : 'inactive'}`}
-                  onClick={() => handleProjectClick(project)}
-                >
-                  <div className="collapsed-project-initials">
-                    {getInitials(project.name)}
-                  </div>
-                  <div className="collapsed-project-name">
-                    {project.name}
-                  </div>
-                  <div className="collapsed-project-status-dot-container">
-                    <div 
-                      className="collapsed-project-status-dot"
-                      style={{ backgroundColor: getStatusColor(status) }}
-                    ></div>
-                  </div>
-                  {isSelected && (
-                    <div className="collapsed-selected-badge">●</div>
-                  )}
-                  {!isSelected && (
-                    <div className="collapsed-project-progress">
-                      <div className="collapsed-progress-bar">
-                        <div 
-                          className="collapsed-progress-fill" 
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Right Side - Project Details */}
-      <div className="project-details">
-        {displayProject ? (
-          <div className="project-details-content">
-            <div className="project-details-header">
-              <div className="project-details-header-left">
-                <div className="project-title-row">
-                  <h2>{displayProject.name}</h2>
-                  <div className="project-actions-dropdown" ref={dropdownRef}>
-                    <button 
-                      className="dropdown-toggle"
-                      onClick={() => setShowDropdown(!showDropdown)}
-                      aria-label="Project actions"
-                    >
-                      ⋮
-                    </button>
-                    {showDropdown && (
-                      <div className="dropdown-menu">
-                        <button 
-                          className="dropdown-item edit"
-                          onClick={handleEditClick}
-                        >
-                          <span className="dropdown-icon"></span>
-                          Edit Project
-                        </button>
-                        <div className="dropdown-divider"></div>
-                        <button 
-                          className="dropdown-item delete"
-                          onClick={() => handleDeleteProject(displayProject.id)}
-                        >
-                          <span className="dropdown-icon"></span>
-                          Delete Project
-                        </button>
                       </div>
                     )}
                   </div>
-                </div>
-                <span 
-                  className="project-status-badge"
-                  style={{ backgroundColor: getStatusColor(calculateScheduleStatus(displayProject)) }}
-                >
-                  {calculateScheduleStatus(displayProject)}
-                </span>
-              </div>
-            </div>
-
-            {displayProject.description && (
-              <div className="project-description-section">
-                <h4>Description</h4>
-                <p>{displayProject.description}</p>
-              </div>
-            )}
-
-            <div className="project-dates-section">
-              <div className="date-item">
-                <span className="date-label">Start Date</span>
-                <span className="date-value">
-                  {formatDate(displayProject.start_date)}
-                </span>
-              </div>
-              <div className="date-item">
-                <span className="date-label">End Date</span>
-                <span className="date-value">
-                  {formatDate(displayProject.end_date)}
-                </span>
-              </div>
-            </div>
-
-            <div className="project-developers-section">
-              <h4>Developers</h4>
-              <div className="developers-list">
-                {getDevelopersForProject(displayProject.id).length > 0 ? (
-                  getDevelopersForProject(displayProject.id).map((dev, index) => (
-                    <div key={index} className="developer-item">
-                      <div 
-                        className="developer-avatar"
-                        style={{ backgroundColor: getAvatarColor(dev) }}
-                      >
-                        {getInitials(dev)}
-                      </div>
-                      <span className="developer-name">{dev}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="no-developers">No developers assigned yet.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="project-stats-preview">
-              {(() => {
-                const counts = getTaskCounts(displayProject.id);
-                const overdue = getOverdueCount(displayProject.id);
-                const devCount = getDevelopersForProject(displayProject.id).length;
-                
-                return (
-                  <>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{counts.total}</span>
-                      <span className="stat-preview-label">Total Tasks</span>
-                    </div>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{counts.complete}</span>
-                      <span className="stat-preview-label">Completed</span>
-                    </div>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{counts.inProgress}</span>
-                      <span className="stat-preview-label">In Progress</span>
-                    </div>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{counts.notStarted}</span>
-                      <span className="stat-preview-label">Not Started</span>
-                    </div>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{overdue}</span>
-                      <span className="stat-preview-label">Overdue</span>
-                    </div>
-                    <div className="stat-preview-item">
-                      <span className="stat-preview-number">{devCount}</span>
-                      <span className="stat-preview-label">Developers</span>
-                    </div>
-                  </>
                 );
-              })()}
+              })}
             </div>
+          )}
+        </div>
 
-            <div className="project-details-actions">
-              <button 
-                className={`btn-select-project ${selectedProject && selectedProject.id === displayProject.id ? 'selected' : ''}`}
-                onClick={() => handleSelectProject(displayProject)}
-              >
-                {selectedProject && selectedProject.id === displayProject.id ? '✓ SELECTED' : 'SELECT'}
-              </button>
+        {/* Right Side - Project Details */}
+        <div className="project-details">
+          {displayProject ? (
+            <div className="project-details-content">
+              {/* Project Header */}
+              <div className="project-details-header">
+                <div className="project-details-header-left">
+                  <h2 className="project-details-title">{displayProject.name}</h2>
+                  <div className="project-details-meta">
+                    <span 
+                      className="project-status-badge"
+                      style={{ backgroundColor: getStatusColor(calculateScheduleStatus(displayProject)) }}
+                    >
+                      {calculateScheduleStatus(displayProject)}
+                    </span>
+                    {displayProject.description && (
+                      <span className="project-description-text">{displayProject.description}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="project-actions-dropdown" ref={dropdownRef}>
+                  <button 
+                    className="dropdown-toggle"
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    aria-label="Project actions"
+                  >
+                    ⋮
+                  </button>
+                  {showDropdown && (
+                    <div className="dropdown-menu">
+                      <button 
+                        className="dropdown-item edit"
+                        onClick={handleEditClick}
+                      >
+                        <span className="dropdown-icon">✎</span>
+                        Edit Project
+                      </button>
+                      <div className="dropdown-divider"></div>
+                      <button 
+                        className="dropdown-item delete"
+                        onClick={() => handleDeleteProject(displayProject.id)}
+                      >
+                        <span className="dropdown-icon">✕</span>
+                        Delete Project
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Dates Section */}
+              <div className="project-dates-section">
+                <div className="date-item">
+                  <span className="date-label">Start Date</span>
+                  <span className="date-value">
+                    {formatDate(displayProject.start_date)}
+                  </span>
+                </div>
+                <div className="date-item">
+                  <span className="date-label">End Date</span>
+                  <span className="date-value">
+                    {formatDate(displayProject.end_date)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Developers Section */}
+              <div className="project-developers-section">
+                <h4>Developers</h4>
+                <div className="developers-list">
+                  {getDevelopersForProject(displayProject.id).length > 0 ? (
+                    getDevelopersForProject(displayProject.id).map((dev, index) => (
+                      <div key={index} className="developer-item">
+                        <div 
+                          className="developer-avatar"
+                          style={{ backgroundColor: getAvatarColor(dev) }}
+                        >
+                          {getInitials(dev)}
+                        </div>
+                        <span className="developer-name">{dev}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="no-developers">No developers assigned yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats Preview */}
+              <div className="project-stats-preview">
+                {(() => {
+                  const counts = getTaskCounts(displayProject.id);
+                  const overdue = getOverdueCount(displayProject.id);
+                  const devCount = getDevelopersForProject(displayProject.id).length;
+                  
+                  return (
+                    <>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{counts.total}</span>
+                        <span className="stat-preview-label">Total Tasks</span>
+                      </div>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{counts.complete}</span>
+                        <span className="stat-preview-label">Completed</span>
+                      </div>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{counts.inProgress}</span>
+                        <span className="stat-preview-label">In Progress</span>
+                      </div>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{counts.notStarted}</span>
+                        <span className="stat-preview-label">Not Started</span>
+                      </div>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{overdue}</span>
+                        <span className="stat-preview-label">Overdue</span>
+                      </div>
+                      <div className="stat-preview-item">
+                        <span className="stat-preview-number">{devCount}</span>
+                        <span className="stat-preview-label">Developers</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Select Button */}
+              <div className="project-details-actions">
+                <button 
+                  className={`btn-select-project ${selectedProject && selectedProject.id === displayProject.id ? 'selected' : ''}`}
+                  onClick={() => handleSelectProject(displayProject)}
+                >
+                  {selectedProject && selectedProject.id === displayProject.id ? '✓ Selected' : 'Select'}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="no-project-selected">
-            <div className="no-project-icon">📋</div>
-            <h3>No Project Selected</h3>
-            <p>Select a project from the left sidebar to view details.</p>
-          </div>
-        )}
+          ) : (
+            <div className="no-project-selected">
+              <div className="no-project-icon">◈</div>
+              <h3>No Project Selected</h3>
+              <p>Select a project from the left sidebar to view details.</p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ import Workbook from './components/Workbook';
 import Projects from './components/Projects';
 import Milestones from './components/Milestones';
 import SprintTracker from './components/SprintTracker';
+import * as db from './services/database';
 import './App.css';
 
 function AppContent() {
@@ -14,13 +15,13 @@ function AppContent() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [phases, setPhases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [projectTasks, setProjectTasks] = useState({});
   
   const isProjectsPage = location.pathname === '/projects';
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/projects');
-      const data = await response.json();
+      const data = await db.fetchProjects();
       setProjects(data);
       if (data.length > 0 && !selectedProject) {
         setSelectedProject(data[0]);
@@ -35,8 +36,7 @@ function AppContent() {
   const fetchTasks = async (projectId) => {
     if (!projectId) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/tasks/${projectId}`);
-      const data = await response.json();
+      const data = await db.fetchTasksByProject(projectId);
       setTasks(data);
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -46,17 +46,36 @@ function AppContent() {
   const fetchPhases = async (projectId) => {
     if (!projectId) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/phases/${projectId}`);
-      const data = await response.json();
+      const data = await db.fetchPhasesByProject(projectId);
       setPhases(data);
     } catch (error) {
       console.error('Error fetching phases:', error);
     }
   };
 
+  // Fetch tasks for all projects to determine status
+  const fetchAllProjectTasks = async () => {
+    try {
+      const tasksData = {};
+      for (const project of projects) {
+        const data = await db.fetchTasksByProject(project.id);
+        tasksData[project.id] = data;
+      }
+      setProjectTasks(tasksData);
+    } catch (error) {
+      console.error('Error fetching project tasks:', error);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      fetchAllProjectTasks();
+    }
+  }, [projects]);
 
   useEffect(() => {
     if (selectedProject) {
@@ -93,6 +112,60 @@ function AppContent() {
 
   const currentPage = getPageName();
 
+  // Calculate project status - Same logic as Projects tab
+  const calculateProjectStatus = (project) => {
+    if (!project || !project.start_date || !project.end_date) return 'On Track';
+    
+    const today = new Date();
+    const start = new Date(project.start_date);
+    const end = new Date(project.end_date);
+    
+    // If project end date is in the past, mark as Done
+    if (today > end) return 'Done';
+    
+    // Get tasks for this project
+    const tasks = projectTasks[project.id] || [];
+    
+    // Check if ANY task is overdue (not complete and end date is in the past)
+    const hasOverdueTasks = tasks.some(t => {
+      if (t.status === 'Complete') return false;
+      const taskEnd = new Date(t.end_date);
+      return taskEnd < today;
+    });
+    
+    // If there's at least one overdue task, mark as Behind
+    if (hasOverdueTasks) return 'Behind';
+    
+    // If project hasn't started yet, mark as On Track
+    if (today < start) return 'On Track';
+    
+    // Calculate progress to determine if Behind or On Track
+    const totalDuration = end - start;
+    const elapsed = today - start;
+    const progress = (elapsed / totalDuration) * 100;
+    
+    const totalTasks = tasks.length;
+    if (totalTasks === 0) return 'On Track';
+    
+    const completedTasks = tasks.filter(t => t.status === 'Complete').length;
+    const completionRate = (completedTasks / totalTasks) * 100;
+    const difference = completionRate - progress;
+    
+    // If completion rate is significantly behind schedule, mark as Behind
+    if (difference < -15) return 'Behind';
+    
+    return 'On Track';
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      'On Track': '#34c759',
+      'Behind': '#ff3b30',
+      'Done': '#5856d6'
+    };
+    return colors[status] || '#8e8e93';
+  };
+
   return (
     <div className="app">
       {/* Show global navbar with new design for non-project pages */}
@@ -103,7 +176,10 @@ function AppContent() {
             {selectedProject && (
               <div className="navbar-current-project">
                 <span className="navbar-project-name">{selectedProject.name}</span>
-                <span className="navbar-project-dot"></span>
+                <span 
+                  className="navbar-project-dot"
+                  style={{ backgroundColor: getStatusColor(calculateProjectStatus(selectedProject)) }}
+                ></span>
               </div>
             )}
             <div className="navbar-spacer"></div>

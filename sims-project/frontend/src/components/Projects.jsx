@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import * as db from '../services/database';
 import './Projects.css';
 
 function Projects({ projects, selectedProject, onSelectProject, fetchProjects }) {
@@ -7,7 +8,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
-    status: 'On Track',
     start_date: '',
     end_date: ''
   });
@@ -29,18 +29,17 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [previewProject, setPreviewProject] = useState(null);
+  const [dateError, setDateError] = useState('');
 
-  const statusOptions = ['On Track', 'On Hold', 'Ready', 'Done', 'Off Track', 'Blocked'];
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Fetch developers
+  // Fetch developers from Supabase
   const fetchDevelopers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/developers');
-      const data = await response.json();
+      const data = await db.fetchDevelopers();
       setDevelopers(data);
     } catch (error) {
       console.error('Error fetching developers:', error);
@@ -53,8 +52,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     try {
       const tasksData = {};
       for (const project of projects) {
-        const response = await fetch(`http://localhost:5000/api/tasks/${project.id}`);
-        const data = await response.json();
+        const data = await db.fetchTasksByProject(project.id);
         tasksData[project.id] = data;
       }
       setProjectTasks(tasksData);
@@ -90,22 +88,31 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     };
   }, []);
 
-  // Calculate schedule status based on dates
-  const calculateScheduleStatus = (project) => {
-    if (!project.start_date || !project.end_date) return 'On Track';
+  // Calculate project status - AUTOMATICALLY determined by tasks
+  const calculateProjectStatus = (project) => {
+    if (!project || !project.start_date || !project.end_date) return 'On Track';
     
     const today = new Date();
     const start = new Date(project.start_date);
     const end = new Date(project.end_date);
     
-    if (today < start) return 'Ready';
     if (today > end) return 'Done';
+    
+    const tasks = projectTasks[project.id] || [];
+    
+    const hasOverdueTasks = tasks.some(t => {
+      if (t.status === 'Complete') return false;
+      const taskEnd = new Date(t.end_date);
+      return taskEnd < today;
+    });
+    
+    if (hasOverdueTasks) return 'Behind';
+    if (today < start) return 'On Track';
     
     const totalDuration = end - start;
     const elapsed = today - start;
     const progress = (elapsed / totalDuration) * 100;
     
-    const tasks = projectTasks[project.id] || [];
     const totalTasks = tasks.length;
     if (totalTasks === 0) return 'On Track';
     
@@ -113,10 +120,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     const completionRate = (completedTasks / totalTasks) * 100;
     const difference = completionRate - progress;
     
-    if (difference >= 10) return 'On Track';
-    if (difference >= -5 && difference < 10) return 'On Track';
-    if (difference >= -20 && difference < -5) return 'Off Track';
-    if (difference < -20) return 'Blocked';
+    if (difference < -15) return 'Behind';
     
     return 'On Track';
   };
@@ -124,11 +128,8 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const getStatusColor = (status) => {
     const colors = {
       'On Track': '#34c759',
-      'On Hold': '#ff9500',
-      'Ready': '#007aff',
-      'Done': '#5856d6',
-      'Off Track': '#ff3b30',
-      'Blocked': '#ff2d55'
+      'Behind': '#ff3b30',
+      'Done': '#5856d6'
     };
     return colors[status] || '#8e8e93';
   };
@@ -136,11 +137,51 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewProject(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'start_date' || name === 'end_date') {
+      validateDates(name === 'start_date' ? value : newProject.start_date, 
+                   name === 'end_date' ? value : newProject.end_date);
+    }
   };
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
     setEditingProject(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'start_date' || name === 'end_date') {
+      validateDatesEdit(name === 'start_date' ? value : editingProject?.start_date, 
+                        name === 'end_date' ? value : editingProject?.end_date);
+    }
+  };
+
+  const validateDates = (startDate, endDate) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end < start) {
+        setDateError('End date cannot be earlier than start date');
+        return false;
+      }
+      setDateError('');
+      return true;
+    }
+    setDateError('');
+    return true;
+  };
+
+  const validateDatesEdit = (startDate, endDate) => {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end < start) {
+        setDateError('End date cannot be earlier than start date');
+        return false;
+      }
+      setDateError('');
+      return true;
+    }
+    setDateError('');
+    return true;
   };
 
   const handleDeveloperInputChange = (e) => {
@@ -190,27 +231,37 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
+    
+    if (newProject.start_date && newProject.end_date) {
+      const start = new Date(newProject.start_date);
+      const end = new Date(newProject.end_date);
+      if (end < start) {
+        setDateError('End date cannot be earlier than start date');
+        return;
+      }
+    }
+    
     try {
-      const response = await fetch('http://localhost:5000/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProject)
+      const data = await db.createProject({
+        name: newProject.name,
+        description: newProject.description,
+        start_date: newProject.start_date,
+        end_date: newProject.end_date
       });
-      if (response.ok) {
-        await fetchProjects();
-        setIsCreating(false);
-        setShowCreateMenu(false);
-        setNewProject({
-          name: '',
-          description: '',
-          status: 'On Track',
-          start_date: '',
-          end_date: ''
-        });
-        const updatedProjects = await fetch('http://localhost:5000/api/projects').then(r => r.json());
-        if (updatedProjects.length > 0) {
-          onSelectProject(updatedProjects[updatedProjects.length - 1]);
-        }
+      
+      await fetchProjects();
+      setIsCreating(false);
+      setShowCreateMenu(false);
+      setDateError('');
+      setNewProject({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: ''
+      });
+      
+      if (data) {
+        onSelectProject(data);
       }
     } catch (error) {
       console.error('Error creating project:', error);
@@ -221,26 +272,32 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     e.preventDefault();
     if (!editingProject) return;
     
-    try {
-      const response = await fetch(`http://localhost:5000/api/projects/${editingProject.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editingProject.name,
-          description: editingProject.description,
-          status: editingProject.status,
-          start_date: editingProject.start_date,
-          end_date: editingProject.end_date
-        })
-      });
-      if (response.ok) {
-        await fetchProjects();
-        setIsEditing(false);
-        setEditingProject(null);
-        setShowDropdown(false);
-        const updatedProject = await fetch(`http://localhost:5000/api/projects/${editingProject.id}`).then(r => r.json());
-        onSelectProject(updatedProject);
+    if (editingProject.start_date && editingProject.end_date) {
+      const start = new Date(editingProject.start_date);
+      const end = new Date(editingProject.end_date);
+      if (end < start) {
+        setDateError('End date cannot be earlier than start date');
+        return;
       }
+    }
+    
+    try {
+      await db.updateProject(editingProject.id, {
+        name: editingProject.name,
+        description: editingProject.description,
+        start_date: editingProject.start_date,
+        end_date: editingProject.end_date
+      });
+      
+      await fetchProjects();
+      setIsEditing(false);
+      setEditingProject(null);
+      setShowDropdown(false);
+      setDateError('');
+      
+      const updatedProject = await db.fetchProjects();
+      const found = updatedProject.find(p => p.id === editingProject.id);
+      if (found) onSelectProject(found);
     } catch (error) {
       console.error('Error updating project:', error);
     }
@@ -249,33 +306,25 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleAddDeveloper = async (e) => {
     e.preventDefault();
     try {
-      const developerData = {
+      await db.createDeveloper({
         name: newDeveloper.name,
         email: newDeveloper.email,
         role: newDeveloper.role,
         avatar: newDeveloper.avatar
-      };
-
-      const response = await fetch('http://localhost:5000/api/developers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(developerData)
       });
 
-      if (response.ok) {
-        await fetchDevelopers();
-        setIsCreating(false);
-        setShowCreateMenu(false);
-        setNewDeveloper({
-          name: '',
-          email: '',
-          role: '',
-          avatar: null
-        });
-        setAvatarPreview(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+      await fetchDevelopers();
+      setIsCreating(false);
+      setShowCreateMenu(false);
+      setNewDeveloper({
+        name: '',
+        email: '',
+        role: '',
+        avatar: null
+      });
+      setAvatarPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     } catch (error) {
       console.error('Error adding developer:', error);
@@ -285,20 +334,15 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleDeleteProject = async (id) => {
     if (window.confirm('⚠️ Are you sure you want to delete this project and all its tasks? This action cannot be undone.')) {
       try {
-        const response = await fetch(`http://localhost:5000/api/projects/${id}`, {
-          method: 'DELETE'
-        });
-        if (response.ok) {
-          await fetchProjects();
-          setShowDropdown(false);
-          if (selectedProject && selectedProject.id === id) {
-            const updatedProjects = await fetch('http://localhost:5000/api/projects').then(r => r.json());
-            if (updatedProjects.length > 0) {
-              onSelectProject(updatedProjects[0]);
-            } else {
-              onSelectProject(null);
-            }
-          }
+        await db.deleteProject(id);
+        await fetchProjects();
+        setShowDropdown(false);
+        
+        const updatedProjects = await db.fetchProjects();
+        if (updatedProjects.length > 0) {
+          onSelectProject(updatedProjects[0]);
+        } else {
+          onSelectProject(null);
         }
       } catch (error) {
         console.error('Error deleting project:', error);
@@ -311,6 +355,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
       setEditingProject({ ...selectedProject });
       setIsEditing(true);
       setShowDropdown(false);
+      setDateError('');
     }
   };
 
@@ -376,7 +421,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const formatDate = (dateString) => {
     if (!dateString) return 'Not set';
     const date = new Date(dateString);
-    const month = date.toLocaleString('default', { month: 'short' });
+    const month = date.toLocaleString('default', { month: 'long' });
     const day = date.getDate();
     const year = date.getFullYear();
     return `${month} ${day}, ${year}`;
@@ -392,17 +437,18 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleCreateButtonClick = (e) => {
     e.stopPropagation();
     setShowCreateMenu(!showCreateMenu);
+    setDateError('');
   };
 
   const handleMenuItemClick = (type) => {
     setCreateType(type);
     setShowCreateMenu(false);
     setIsCreating(true);
+    setDateError('');
     if (type === 'project') {
       setNewProject({
         name: '',
         description: '',
-        status: 'On Track',
         start_date: '',
         end_date: ''
       });
@@ -422,7 +468,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
 
   const displayProject = previewProject || selectedProject;
 
-  // Projects Header Component with stacked layout - NO EMOJIS
+  // Projects Header Component with stacked layout
   const ProjectsHeader = () => {
     return (
       <div className="projects-global-header">
@@ -433,7 +479,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
               <span className="project-name">{selectedProject.name}</span>
               <span 
                 className="project-status-dot"
-                style={{ backgroundColor: getStatusColor(calculateScheduleStatus(selectedProject)) }}
+                style={{ backgroundColor: getStatusColor(calculateProjectStatus(selectedProject)) }}
               ></span>
             </div>
           )}
@@ -460,7 +506,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
               <span className="nav-icon">▶</span>
               Sprint Tracker
             </Link>
-            
           </div>
         </div>
       </div>
@@ -576,6 +621,23 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                                 onChange={handleInputChange} 
                               />
                             </div>
+                            {dateError && (
+                              <div className="form-group full-width">
+                                <div className="date-error">{dateError}</div>
+                              </div>
+                            )}
+                            <div className="form-group full-width" style={{ marginTop: '0.5rem' }}>
+                              <div style={{ 
+                                fontSize: '0.7rem', 
+                                color: '#8e8e93', 
+                                background: '#f8f9fa', 
+                                padding: '0.5rem 0.75rem', 
+                                borderRadius: '8px',
+                                border: '0.5px solid rgba(60, 60, 67, 0.06)'
+                              }}>
+                                <strong>Note:</strong> Project status is automatically determined by task completion and overdue tasks.
+                              </div>
+                            </div>
                           </div>
                         </>
                       ) : (
@@ -652,6 +714,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                           setIsCreating(false);
                           setShowCreateMenu(false);
                           setAvatarPreview(null);
+                          setDateError('');
                           if (fileInputRef.current) {
                             fileInputRef.current.value = '';
                           }
@@ -694,16 +757,13 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                           />
                         </div>
                         <div className="form-group">
-                          <label>Status</label>
-                          <select 
-                            name="status" 
-                            value={editingProject.status} 
-                            onChange={handleEditInputChange}
-                          >
-                            {statusOptions.map(status => (
-                              <option key={status} value={status}>{status}</option>
-                            ))}
-                          </select>
+                          <label>Start Date</label>
+                          <input 
+                            type="date" 
+                            name="start_date" 
+                            value={editingProject.start_date || ''} 
+                            onChange={handleEditInputChange} 
+                          />
                         </div>
                         <div className="form-group">
                           <label>End Date</label>
@@ -714,11 +774,47 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                             onChange={handleEditInputChange} 
                           />
                         </div>
+                        <div className="form-group full-width">
+                          <label>Current Status (Auto-calculated)</label>
+                          <div style={{
+                            padding: '0.75rem',
+                            borderRadius: '12px',
+                            background: '#f8f9fa',
+                            border: '0.5px solid rgba(60, 60, 67, 0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem'
+                          }}>
+                            <span 
+                              className="project-status-badge"
+                              style={{ 
+                                backgroundColor: getStatusColor(calculateProjectStatus(editingProject)),
+                                padding: '0.2rem 0.8rem',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: 'white',
+                                display: 'inline-block'
+                              }}
+                            >
+                              {calculateProjectStatus(editingProject)}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#8e8e93' }}>
+                              (Determined by task completion & overdue tasks)
+                            </span>
+                          </div>
+                        </div>
+                        {dateError && (
+                          <div className="form-group full-width">
+                            <div className="date-error">{dateError}</div>
+                          </div>
+                        )}
                       </div>
                       <div className="modal-actions">
                         <button type="button" className="btn-cancel" onClick={() => {
                           setIsEditing(false);
                           setEditingProject(null);
+                          setDateError('');
                         }}>Cancel</button>
                         <button type="submit" className="btn-save">Update Project</button>
                       </div>
@@ -736,7 +832,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                     const progress = getProjectProgress(project.id);
                     const isSelected = selectedProject && selectedProject.id === project.id;
                     const isPreview = previewProject && previewProject.id === project.id;
-                    const status = calculateScheduleStatus(project);
+                    const status = calculateProjectStatus(project);
                     
                     return (
                       <div 
@@ -811,7 +907,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
               {projects.map((project) => {
                 const isSelected = selectedProject && selectedProject.id === project.id;
                 const progress = getProjectProgress(project.id);
-                const status = calculateScheduleStatus(project);
+                const status = calculateProjectStatus(project);
                 
                 return (
                   <div 
@@ -855,16 +951,15 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
         <div className="project-details">
           {displayProject ? (
             <div className="project-details-content">
-              {/* Project Header */}
               <div className="project-details-header">
                 <div className="project-details-header-left">
                   <h2 className="project-details-title">{displayProject.name}</h2>
                   <div className="project-details-meta">
                     <span 
                       className="project-status-badge"
-                      style={{ backgroundColor: getStatusColor(calculateScheduleStatus(displayProject)) }}
+                      style={{ backgroundColor: getStatusColor(calculateProjectStatus(displayProject)) }}
                     >
-                      {calculateScheduleStatus(displayProject)}
+                      {calculateProjectStatus(displayProject)}
                     </span>
                     {displayProject.description && (
                       <span className="project-description-text">{displayProject.description}</span>
@@ -901,7 +996,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 </div>
               </div>
 
-              {/* Dates Section */}
               <div className="project-dates-section">
                 <div className="date-item">
                   <span className="date-label">Start Date</span>
@@ -917,7 +1011,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 </div>
               </div>
 
-              {/* Developers Section */}
               <div className="project-developers-section">
                 <h4>Developers</h4>
                 <div className="developers-list">
@@ -939,7 +1032,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 </div>
               </div>
 
-              {/* Stats Preview */}
               <div className="project-stats-preview">
                 {(() => {
                   const counts = getTaskCounts(displayProject.id);
@@ -953,23 +1045,23 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                         <span className="stat-preview-label">Total Tasks</span>
                       </div>
                       <div className="stat-preview-item">
-                        <span className="stat-preview-number">{counts.complete}</span>
+                        <span className="stat-preview-number green">{counts.complete}</span>
                         <span className="stat-preview-label">Completed</span>
                       </div>
                       <div className="stat-preview-item">
-                        <span className="stat-preview-number">{counts.inProgress}</span>
+                        <span className="stat-preview-number orange">{counts.inProgress}</span>
                         <span className="stat-preview-label">In Progress</span>
                       </div>
                       <div className="stat-preview-item">
-                        <span className="stat-preview-number">{counts.notStarted}</span>
+                        <span className="stat-preview-number gray">{counts.notStarted}</span>
                         <span className="stat-preview-label">Not Started</span>
                       </div>
                       <div className="stat-preview-item">
-                        <span className="stat-preview-number">{overdue}</span>
+                        <span className="stat-preview-number red">{overdue}</span>
                         <span className="stat-preview-label">Overdue</span>
                       </div>
                       <div className="stat-preview-item">
-                        <span className="stat-preview-number">{devCount}</span>
+                        <span className="stat-preview-number gradient">{devCount}</span>
                         <span className="stat-preview-label">Developers</span>
                       </div>
                     </>
@@ -977,7 +1069,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 })()}
               </div>
 
-              {/* Select Button */}
               <div className="project-details-actions">
                 <button 
                   className={`btn-select-project ${selectedProject && selectedProject.id === displayProject.id ? 'selected' : ''}`}

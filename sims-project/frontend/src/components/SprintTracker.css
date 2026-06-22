@@ -1,7 +1,23 @@
+/* =========================================
+   1. CORE LAYOUT & MASTER CARD CONTAINER
+   ========================================= */
 .sprint-tracker-view {
   padding: 2rem;
-  max-width: 1400px;
+  max-width: 1600px; /* Expanded so tables have much more room */
+  width: 98%;
   margin: 0 auto;
+}
+
+/* --- The New "Bigger Card" Wrapper --- */
+.master-wrapper-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(60, 60, 67, 0.04);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 80vh;
 }
 
 .tracker-header-row {
@@ -18,10 +34,67 @@
   color: #1c1c1e;
 }
 
+/* Flat, sleek outline for inner table cards */
 .tracker-card {
   padding: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: transparent; 
+  border: 1px solid rgba(60, 60, 67, 0.08); /* Sleek subtle outline */
+  border-radius: 16px;
+  width: 100%;
+}
+
+/* --- Redesigned Segmented Control Tabs --- */
+.tracker-tabs {
+  display: inline-flex;
+  gap: 24px;
+  margin-bottom: 32px; /* Extra breathing room below tabs */
+  border-bottom: 1px solid rgba(60, 60, 67, 0.08); /* Sleek bottom track line */
+  background: transparent; 
+  padding: 0;
+  width: 100%;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #8e8e93;
+  padding: 8px 12px 14px 12px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.25s ease;
+}
+
+.tab-btn:hover { color: #1c1c1e; }
+.tab-btn.active { color: #1c1c1e; }
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #007aff, #50bcf2);
+  border-radius: 3px 3px 0 0;
+  animation: slideInLine 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInLine {
+  from { transform: scaleX(0.5); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* =========================================
+   2. TABLE & SCROLL ARCHITECTURE
+   ========================================= */
+.scrollable-table-container {
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  overflow-x: auto;
+  width: 100%;
 }
 
 .table-responsive {
@@ -30,45 +103,46 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.tracker-table {
+.ios-table.tracker-table {
   width: 100%;
-  min-width: 1200px; /* Assures readable layouts on smaller horizontal responsive views */
+  min-width: 1200px; 
   border-collapse: collapse;
+  overflow: visible !important; 
 }
 
-/* Custom Add Option Styling inside Dropdowns */
-.add-new-option-item {
-  font-weight: 600;
-  color: #007aff !important;
-  background-color: #f2f2f7;
+.ios-table.tracker-table th {
+  position: sticky;
+  top: 0;
+  z-index: 20; 
+  background: #f8f8fa;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); 
+  border-bottom: 1px solid rgba(60, 60, 67, 0.1);
 }
 
-/* Row display rules */
+/* =========================================
+   3. ROW, TEXT & INPUT STYLING
+   ========================================= */
+.row-editing {
+  background: linear-gradient(90deg, rgba(0, 122, 255, 0.04) 0%, rgba(0, 122, 255, 0.01) 100%) !important;
+  box-shadow: inset 4px 0 0 #007aff; 
+}
+
 .static-cell-text {
   font-size: 0.9rem;
   color: #1c1c1e;
   display: inline-block;
   padding: 4px 0;
+  white-space: pre-wrap; 
+  word-wrap: break-word; 
 }
 
-.font-semibold {
-  font-weight: 500;
-}
+.font-semibold { font-weight: 500; }
+.notes-text { color: #8e8e93; font-size: 0.85rem; }
 
-.notes-text {
-  color: #8e8e93;
-  font-size: 0.85rem;
-}
-
-.row-editing {
-  background-color: rgba(0, 122, 255, 0.02) !important;
-}
-
-/* Minimalist Input Form Elements */
 .ios-table-input,
 .ios-table-select {
   width: 100%;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid rgba(60, 60, 67, 0.15);
   border-radius: 8px;
   background-color: #ffffff;
@@ -79,28 +153,126 @@
   transition: all 0.15s ease;
 }
 
+.ios-table-textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(60, 60, 67, 0.15);
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #1c1c1e;
+  box-sizing: border-box;
+  resize: none; 
+  overflow: hidden; 
+  line-height: 1.4;
+  transition: border-color 0.15s ease;
+}
+
 .ios-table-input:focus,
-.ios-table-select:focus {
+.ios-table-select:focus,
+.ios-table-textarea:focus {
   outline: none;
   border-color: #007aff;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
-.ios-table-select-multiple {
-  min-height: 50px;
-  max-height: 65px;
-  padding: 4px;
+.input-error {
+  border-color: #ff3b30 !important;
+  background-color: rgba(255, 59, 48, 0.05) !important;
 }
 
-.ios-helper-text {
-  display: block;
-  font-size: 0.65rem;
+.add-new-option-item {
+  font-weight: 600;
+  color: #007aff !important;
+  background-color: #f2f2f7;
+}
+
+/* =========================================
+   4. INTERACTIVE ASSIGNEE TAGS & POPOVER
+   ========================================= */
+.assignee-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.assignee-tag {
+  display: inline-block;
+  background: #f2f2f7;
+  color: #1c1c1e;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.assignee-tag.selected { background: #007aff; color: #ffffff; }
+.assignee-tag.view-only { cursor: default; background: rgba(0, 122, 255, 0.08); color: #007aff; }
+.assignee-tag.more-tag { cursor: pointer; background: #e5e5ea; color: #8e8e93; }
+.assignee-tag.more-tag:hover { background: #d1d1d6; }
+
+.assignee-popover {
+  position: absolute;
+  bottom: 100%; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  z-index: 999 !important;
+  margin-bottom: 12px; 
+  animation: popoverFadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.assignee-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #ffffff transparent transparent transparent;
+}
+
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: #8e8e93;
-  margin-top: 2px;
-  text-align: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
 }
 
-/* Beautiful Status and Priority Badges */
+.popover-header button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #8e8e93;
+  cursor: pointer;
+}
+
+@keyframes popoverFadeInUp {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* =========================================
+   5. BADGES & BUTTONS
+   ========================================= */
 .ios-badge {
   display: inline-block;
   padding: 4px 10px;
@@ -111,13 +283,11 @@
   text-transform: capitalize;
 }
 
-/* Priority Indicator Badges */
 .priority-critical { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
 .priority-high { background: rgba(255, 149, 0, 0.12); color: #ff9500; }
 .priority-medium { background: rgba(0, 122, 255, 0.12); color: #007aff; }
 .priority-low { background: rgba(142, 142, 147, 0.15); color: #8e8e93; }
 
-/* Status Indicator Badges */
 .status-done { background: rgba(52, 199, 89, 0.12); color: #34c759; }
 .status-in-progress { background: rgba(90, 200, 250, 0.15); color: #007aff; }
 .status-blocked { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
@@ -131,7 +301,6 @@
   font-size: 0.8rem;
 }
 
-/* Mini Action Buttons CSS Framework */
 .action-button-group {
   display: flex;
   gap: 8px;
@@ -148,37 +317,228 @@
   transition: all 0.15s ease;
 }
 
-.btn-edit {
-  background-color: rgba(0, 122, 255, 0.1);
-  color: #007aff;
-}
+.btn-edit { background-color: rgba(0, 122, 255, 0.1); color: #007aff; }
 .btn-edit:hover { background-color: rgba(0, 122, 255, 0.2); }
-
-.btn-save {
-  background-color: #34c759;
-  color: white;
-}
+.btn-save { background-color: #34c759; color: white; }
 .btn-save:hover { background-color: #28a745; }
-
-.btn-delete {
-  background-color: rgba(255, 59, 48, 0.1);
-  color: #ff3b30;
-}
+.btn-delete { background-color: rgba(255, 59, 48, 0.1); color: #ff3b30; }
 .btn-delete:hover { background-color: rgba(255, 59, 48, 0.2); }
 
-/* System Responsiveness Styles Rules (Media Queries) */
+.btn-gradient {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+}
+
+.btn-gradient:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35);
+}
+
+.ios-button-secondary {
+  background: rgba(142, 142, 147, 0.12);
+  color: #1c1c1e;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ios-button-secondary:hover { background: rgba(142, 142, 147, 0.2); }
+
+/* =========================================
+   6. DRAGGABLE FILTER & MODALS
+   ========================================= */
+.floating-prompt-panel {
+  position: fixed;
+  top: 80px; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.85); 
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  z-index: 1000; 
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.floating-prompt-panel h4 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1c1c1e;
+  text-align: center;
+}
+
+.floating-prompt-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.floating-prompt-actions button { flex: 1; padding: 8px; }
+
+/* Filter Panel Updates */
+.filter-panel {
+  position: fixed;
+  width: 320px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  z-index: 999;
+  border-top: 4px solid #007aff;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(60, 60, 67, 0.1);
+  background: rgba(0, 122, 255, 0.02);
+  border-radius: 12px 12px 0 0;
+}
+
+.filter-header:active { cursor: grabbing; }
+
+.filter-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1c1c1e;
+  pointer-events: none; 
+}
+
+.filter-clear-btn {
+  background: none;
+  border: none;
+  color: #007aff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filter-clear-btn:hover { text-decoration: underline; }
+
+.filter-body {
+  padding: 20px;
+}
+
+.filter-group { margin-bottom: 12px; }
+
+.filter-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.tracker-actions-wrapper {
+  position: relative;
+  display: flex;
+  gap: 12px;
+}
+
+/* =========================================
+   7. METRICS CARDS (Overview & View Tabs)
+   ========================================= */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.metric-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: none;
+  border: 1px solid rgba(60, 60, 67, 0.08);
+}
+
+.metric-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-card .metric-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1c1c1e;
+}
+
+.metric-card.done .metric-value { color: #34c759; }
+.metric-card.in-progress .metric-value { color: #ff9500; }
+.metric-card.blocked .metric-value { color: #ff3b30; }
+.metric-card.primary .metric-value { color: #007aff; }
+
+.sprint-selector-container {
+  background: transparent;
+  padding: 16px 0;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sprint-selector-container h3 { margin: 0; font-size: 1rem; color: #1c1c1e; }
+.sprint-selector-container select { flex: 1; font-size: 1rem; padding: 8px; max-width: 400px; }
+
 @media (max-width: 768px) {
-  .sprint-tracker-view {
-    padding: 1rem;
-  }
-  
-  .tracker-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .ios-button {
-    width: 100%;
-    text-align: center;
-  }
+  .sprint-tracker-view { padding: 1rem; width: 100%; }
+  .master-wrapper-card { padding: 16px; }
+  .tracker-header-row { flex-direction: column; align-items: flex-start; }
+  .ios-button, .btn-gradient { width: 100%; text-align: center; }
+  .tracker-tabs { flex-direction: column; gap: 8px; }
+  .filter-panel { width: 90vw; left: 5vw !important; top: 10vh !important; }
+}
+
+/* =========================================
+   10. GLOBAL TABLE STRETCH FIX
+   ========================================= */
+/* Forces all tables inside the Sprint Tracker to maximize card width */
+.sprint-tracker-view .ios-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+/* Ensure the wrapper cards in Overview and View tabs stretch fully */
+.sprint-tracker-view .ios-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Optional: Give the task name/sprint columns a bit more priority on stretch */
+.sprint-tracker-view .ios-table th:nth-child(2) {
+  min-width: 250px;
 }

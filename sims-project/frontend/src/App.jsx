@@ -4,8 +4,7 @@ import Dashboard from './components/Dashboard';
 import Workbook from './components/Workbook';
 import Projects from './components/Projects';
 import Milestones from './components/Milestones';
-import SprintTracker from './components/SprintTracker';
-import * as db from './services/database';
+import SprintTrackerPage from './components/SprintTrackerPage';
 import './App.css';
 
 function AppContent() {
@@ -209,7 +208,7 @@ function AppContent() {
             </div>
           </div>
         </nav>
-      )}
+      )} {/* <-- FIXED: This closing bracket was deleted in the merge! */}
 
       <Routes>
         <Route path="/" element={
@@ -242,13 +241,14 @@ function AppContent() {
           />
         } />
         <Route path="/sprint-tracker" element={
-          <SprintTracker />
+          <SprintTrackerPage />
         } />
       </Routes>
     </div>
   );
 }
 
+// FIXED: Re-added the main App wrapper for the Router
 function App() {
   return (
     <Router>

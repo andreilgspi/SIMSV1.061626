@@ -47,3 +47,15 @@ export const createDeveloper = async (devData) => {
   if (error) throw error;
   return data ? data[0] : null;
 };
+
+export const updateDeveloper = async (id, devData) => {
+  const { data, error } = await supabase.from('developers').update(devData).eq('id', id).select();
+  if (error) throw error;
+  return data ? data[0] : null;
+};
+
+export const deleteDeveloper = async (id) => {
+  const { error } = await supabase.from('developers').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+};

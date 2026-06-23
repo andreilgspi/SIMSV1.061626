@@ -6,6 +6,7 @@ import Projects from './components/Projects';
 import Milestones from './components/Milestones';
 import SprintTrackerPage from './components/SprintTrackerPage';
 import './App.css';
+import * as db from './services/database';
 
 function AppContent() {
   const location = useLocation();

@@ -4,24 +4,30 @@ import * as db from '../services/database';
 import './Projects.css';
 
 function Projects({ projects, selectedProject, onSelectProject, fetchProjects }) {
-  // Project States
+  // --- Project States ---
   const [isCreating, setIsCreating] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', description: '', start_date: '', end_date: '' });
+  const [newProject, setNewProject] = useState({ name: '', description: '', start_date: '', end_date: '', team: [] });
   const [editingProject, setEditingProject] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [previewProject, setPreviewProject] = useState(null);
   const [projectTasks, setProjectTasks] = useState({});
-  const [dateError, setDateError] = useState('');
 
-  // Developer States
+  // --- Developer States ---
   const [developers, setDevelopers] = useState([]);
   const [newDeveloper, setNewDeveloper] = useState({ name: '', email: '', role: '', avatar: null });
   const [previewDeveloper, setPreviewDeveloper] = useState(null);
   const [isEditingDeveloper, setIsEditingDeveloper] = useState(false);
   const [editingDeveloper, setEditingDeveloper] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
 
-  // UI States
+  // --- Role & Floating Prompt States ---
+  const [availableRoles, setAvailableRoles] = useState([
+    'Project Manager', 'Frontend Developer', 'Backend Developer', 
+    'Quality Assurance', 'Business Analyst', 'UI Designer', 'UX Designer'
+  ]);
+  const [floatingPrompt, setFloatingPrompt] = useState({ isOpen: false, type: '' });
+  const [promptValue, setPromptValue] = useState('');
+
+  // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('projects');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -31,10 +37,9 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
 
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
-  const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Fetch Data
+  // --- Fetching Data ---
   const fetchDevelopers = async () => {
     try {
       const data = await db.fetchDevelopers();
@@ -60,21 +65,16 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     fetchDevelopers();
   }, [projects]);
 
-  // Click Outside Logic
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target) && buttonRef.current && !buttonRef.current.contains(event.target)) {
-        setShowCreateMenu(false);
-      }
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(event.target) && buttonRef.current && !buttonRef.current.contains(event.target)) setShowCreateMenu(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setShowDropdown(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- Project & Developer Calculations ---
+  // --- Calculations ---
   const calculateProjectStatus = (project) => {
     if (!project || !project.start_date || !project.end_date) return 'On Track';
     const today = new Date(), start = new Date(project.start_date), end = new Date(project.end_date);
@@ -92,17 +92,14 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const getDeveloperStats = (devName) => {
     let total = 0, completed = 0, inProgress = 0, overdue = 0;
     const today = new Date();
-
     Object.values(projectTasks).flat().forEach(task => {
       let isAssigned = false;
       if (Array.isArray(task.assignees) && task.assignees.includes(devName)) isAssigned = true;
       if (typeof task.owner === 'string' && task.owner.includes(devName)) isAssigned = true;
-
       if (isAssigned) {
         total++;
         if (task.status === 'Complete' || task.status === 'Done') completed++;
         else if (task.status === 'In Progress') inProgress++;
-
         if (task.status !== 'Complete' && task.status !== 'Done' && new Date(task.end_date) < today) overdue++;
       }
     });
@@ -115,6 +112,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     if (tasks.length === 0) return 0;
     return Math.round(tasks.reduce((sum, t) => sum + (t.percent_complete || 0), 0) / tasks.length);
   };
+  
   const getTaskCounts = (projectId) => {
     const tasks = projectTasks[projectId] || [];
     return {
@@ -124,39 +122,21 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
       notStarted: tasks.filter(t => t.status === 'Not Started' || t.status === 'To Do').length
     };
   };
+  
   const getOverdueCount = (projectId) => {
     const today = new Date();
     return (projectTasks[projectId] || []).filter(t => new Date(t.end_date) < today && t.status !== 'Complete' && t.status !== 'Done').length;
   };
-  const getDevelopersForProject = (projectId) => {
-    const ownerSet = new Set();
-    (projectTasks[projectId] || []).forEach(task => {
+
+  const getDevelopersForProject = (project) => {
+    // Combine explicit team assignments and inferred task assignments
+    const explicitTeam = project?.team || [];
+    const ownerSet = new Set(explicitTeam);
+    (projectTasks[project.id] || []).forEach(task => {
       if (Array.isArray(task.assignees)) task.assignees.forEach(o => ownerSet.add(o));
       else if (task.owner) task.owner.split(',').forEach(o => ownerSet.add(o.trim()));
     });
     return Array.from(ownerSet);
-  };
-
-  // --- Input Handlers ---
-  const handleInputChange = (e) => setNewProject({ ...newProject, [e.target.name]: e.target.value });
-  const handleEditInputChange = (e) => setEditingProject({ ...editingProject, [e.target.name]: e.target.value });
-  const handleDeveloperInputChange = (e) => setNewDeveloper({ ...newDeveloper, [e.target.name]: e.target.value });
-  const handleEditDeveloperInputChange = (e) => setEditingDeveloper({ ...editingDeveloper, [e.target.name]: e.target.value });
-
-  // Avatar Logic
-  const handleAvatarUpload = (e, isEditing = false) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64String = event.target.result;
-      if (isEditing) setEditingDeveloper({ ...editingDeveloper, avatar: base64String });
-      else {
-        setAvatarPreview(base64String);
-        setNewDeveloper({ ...newDeveloper, avatar: base64String });
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const getAvatarColor = (name) => {
@@ -165,10 +145,52 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
   };
+  
   const getInitials = (name) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
 
-  // --- Project Actions ---
+  // --- Handlers ---
+  const handleInputChange = (e) => setNewProject({ ...newProject, [e.target.name]: e.target.value });
+  const handleEditInputChange = (e) => setEditingProject({ ...editingProject, [e.target.name]: e.target.value });
+  const handleDeveloperInputChange = (e) => setNewDeveloper({ ...newDeveloper, [e.target.name]: e.target.value });
+  const handleEditDeveloperInputChange = (e) => setEditingDeveloper({ ...editingDeveloper, [e.target.name]: e.target.value });
+
+  // Developer Tag Toggles for Projects
+  const toggleNewProjectDeveloper = (devName) => {
+    const currentTeam = newProject.team || [];
+    const newTeam = currentTeam.includes(devName) ? currentTeam.filter(n => n !== devName) : [...currentTeam, devName];
+    setNewProject({ ...newProject, team: newTeam });
+  };
+
+  const toggleEditProjectDeveloper = (devName) => {
+    const currentTeam = editingProject.team || [];
+    const newTeam = currentTeam.includes(devName) ? currentTeam.filter(n => n !== devName) : [...currentTeam, devName];
+    setEditingProject({ ...editingProject, team: newTeam });
+  };
+
+  // Role Dropdown Logic
+  const handleRoleSelect = (e, target) => {
+    const value = e.target.value;
+    if (value === 'ADD_NEW_ROLE') {
+      setPromptValue('');
+      setFloatingPrompt({ isOpen: true, type: target });
+    } else {
+      if (target === 'new') setNewDeveloper({ ...newDeveloper, role: value });
+      if (target === 'edit') setEditingDeveloper({ ...editingDeveloper, role: value });
+    }
+  };
+
+  const submitCustomRole = () => {
+    if (!promptValue.trim()) return;
+    setAvailableRoles([...availableRoles, promptValue]);
+    
+    if (floatingPrompt.type === 'new') setNewDeveloper({ ...newDeveloper, role: promptValue });
+    if (floatingPrompt.type === 'edit') setEditingDeveloper({ ...editingDeveloper, role: promptValue });
+    
+    setFloatingPrompt({ isOpen: false, type: '' });
+  };
+
+  // --- Actions ---
   const handleCreateProject = async (e) => {
     e.preventDefault();
     try {
@@ -176,7 +198,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
       await fetchProjects();
       setIsCreating(false);
       setShowCreateMenu(false);
-      setNewProject({ name: '', description: '', start_date: '', end_date: '' });
+      setNewProject({ name: '', description: '', start_date: '', end_date: '', team: [] });
       if (data) onSelectProject(data);
     } catch (error) { console.error(error); }
   };
@@ -190,7 +212,10 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
       setShowDropdown(false);
       const updatedProject = await db.fetchProjects();
       const found = updatedProject.find(p => p.id === editingProject.id);
-      if (found) onSelectProject(found);
+      if (found) {
+        onSelectProject(found);
+        setPreviewProject(found);
+      }
     } catch (error) { console.error(error); }
   };
 
@@ -203,7 +228,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
     }
   };
 
-  // --- Developer Actions ---
   const handleAddDeveloper = async (e) => {
     e.preventDefault();
     try {
@@ -212,7 +236,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
       setIsCreating(false);
       setShowCreateMenu(false);
       setNewDeveloper({ name: '', email: '', role: '', avatar: null });
-      setAvatarPreview(null);
     } catch (error) { console.error(error); }
   };
 
@@ -243,6 +266,23 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
 
   return (
     <>
+      {/* Floating Prompt for Custom Roles (No background blur) */}
+      {floatingPrompt.isOpen && (
+        <div className="floating-prompt-panel ios-card">
+          <h4>Add Custom Role</h4>
+          <input 
+            type="text" autoFocus className="ios-table-input" 
+            placeholder="e.g. Scrum Master" value={promptValue} 
+            onChange={(e) => setPromptValue(e.target.value)} 
+            onKeyDown={(e) => e.key === 'Enter' && submitCustomRole()} 
+          />
+          <div className="floating-prompt-actions">
+            <button className="ios-button-secondary" onClick={() => setFloatingPrompt({ isOpen: false, type: '' })}>Cancel</button>
+            <button className="btn-save" style={{padding: '0.75rem 1.5rem', borderRadius: '12px'}} onClick={submitCustomRole}>Add</button>
+          </div>
+        </div>
+      )}
+
       {/* GLOBAL HEADER */}
       <div className="projects-global-header">
         <div className="projects-header-top">
@@ -288,7 +328,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 </div>
               </div>
 
-              {/* LIST RENDERER */}
               <div className="project-list">
                 {viewMode === 'projects' ? (
                   projects.map(project => (
@@ -319,10 +358,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
               </div>
             </>
           ) : (
-            <div className="collapsed-content">
-              {/* Keep collapsed view simple */}
-              <div style={{textAlign: 'center', marginTop: '20px', color: '#8e8e93', fontSize: '0.8rem'}}>View<br/>Hidden</div>
-            </div> 
+            <div className="collapsed-content"><div style={{textAlign: 'center', marginTop: '20px', color: '#8e8e93', fontSize: '0.8rem'}}>View<br/>Hidden</div></div> 
           )}
         </div>
 
@@ -360,8 +396,8 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                 <div className="project-developers-section">
                   <h4>Assigned Developers</h4>
                   <div className="developers-list">
-                    {getDevelopersForProject(displayProject.id).length > 0 ? (
-                      getDevelopersForProject(displayProject.id).map((dev, i) => (
+                    {getDevelopersForProject(displayProject).length > 0 ? (
+                      getDevelopersForProject(displayProject).map((dev, i) => (
                         <div key={i} className="developer-item">
                           <div className="developer-avatar" style={{ backgroundColor: getAvatarColor(dev) }}>{getInitials(dev)}</div>
                           <span className="developer-name">{dev}</span>
@@ -388,11 +424,9 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
 
           ) : (
 
-            /* ======== NEW SLEEK DEVELOPER PROFILE ======== */
+            /* ======== SLEEK DEVELOPER PROFILE ======== */
             displayDeveloper ? (
               <div className="project-details-content developer-profile-view">
-                
-                {/* Developer Cover & Header */}
                 <div className="dev-profile-cover"></div>
                 <div className="dev-profile-header">
                   <div className="dev-profile-avatar" style={{ backgroundColor: getAvatarColor(displayDeveloper.name) }}>
@@ -411,14 +445,13 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                     <button className="dropdown-toggle" onClick={() => setShowDropdown(!showDropdown)}>⋮</button>
                     {showDropdown && (
                       <div className="dropdown-menu">
-                        <button className="dropdown-item edit" onClick={() => { setEditingDeveloper(displayDeveloper); setIsEditingDeveloper(true); setShowDropdown(false); }}>✎ Edit Developer</button>
-                        <button className="dropdown-item delete" onClick={() => handleDeleteDeveloper(displayDeveloper.id)}>✕ Delete Developer</button>
+                        <button className="dropdown-item edit" onClick={() => { setEditingDeveloper(displayDeveloper); setIsEditingDeveloper(true); setShowDropdown(false); }}>✎ Edit Profile</button>
+                        <button className="dropdown-item delete" onClick={() => handleDeleteDeveloper(displayDeveloper.id)}>✕ Remove</button>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Developer Workload Stats */}
                 <h4 style={{marginTop: '2rem', marginBottom: '1rem', color: '#1c1c1e'}}>Current Workload</h4>
                 <div className="project-stats-preview">
                     {(() => {
@@ -433,9 +466,8 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                       )
                     })()}
                 </div>
-
               </div>
-            ) : <div className="no-project-selected"><h3>No Developer Selected</h3><p>Select a developer from the list to view their workload.</p></div>
+            ) : <div className="no-project-selected"><h3>No Developer Selected</h3><p>Select a developer to view their profile.</p></div>
           )}
         </div>
       </div>
@@ -449,11 +481,38 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
              <h3>{createType === 'project' ? 'Create New Project' : 'Add New Developer'}</h3>
              <form onSubmit={createType === 'project' ? handleCreateProject : handleAddDeveloper}>
                  {createType === 'project' ? (
-                     <div className="form-group full-width"><label>Name *</label><input type="text" name="name" onChange={handleInputChange} required /></div>
+                     <>
+                       <div className="form-group full-width"><label>Name *</label><input type="text" name="name" onChange={handleInputChange} required /></div>
+                       <div className="form-group full-width"><label>Description</label><textarea name="description" onChange={handleInputChange} /></div>
+                       
+                       <div className="form-group full-width">
+                         <label>Assign Developers</label>
+                         <div className="assignee-tags-container" style={{ border: '1px solid #e5e5ea', padding: '10px', borderRadius: '8px' }}>
+                           {developers.map(dev => (
+                             <span 
+                               key={dev.id} 
+                               className={`assignee-tag ${(newProject.team || []).includes(dev.name) ? 'selected' : ''}`}
+                               onClick={() => toggleNewProjectDeveloper(dev.name)}
+                             >
+                               {dev.name}
+                             </span>
+                           ))}
+                         </div>
+                       </div>
+                     </>
                  ) : (
                      <div className="form-grid">
                         <div className="form-group full-width"><label>Name *</label><input type="text" name="name" onChange={handleDeveloperInputChange} required /></div>
-                        <div className="form-group full-width"><label>Role</label><input type="text" name="role" onChange={handleDeveloperInputChange} placeholder="e.g. Lead Designer" /></div>
+                        
+                        <div className="form-group full-width">
+                          <label>Role</label>
+                          <select value={newDeveloper.role} onChange={(e) => handleRoleSelect(e, 'new')} style={{width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #ccc'}}>
+                            <option value="" disabled>Select a Role...</option>
+                            {availableRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                            <option value="ADD_NEW_ROLE" style={{fontWeight: 'bold', color: '#007aff'}}>+ Add New Role...</option>
+                          </select>
+                        </div>
+                        
                         <div className="form-group full-width"><label>Email</label><input type="email" name="email" onChange={handleDeveloperInputChange} /></div>
                      </div>
                  )}
@@ -466,24 +525,79 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
         </div>
       )}
 
+      {/* FIXED: Edit Project Modal */}
+      {isEditing && editingProject && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Edit Project</h3>
+            <form onSubmit={handleUpdateProject}>
+               <div className="form-group full-width">
+                 <label>Name *</label>
+                 <input type="text" name="name" value={editingProject.name} onChange={handleEditInputChange} required />
+               </div>
+               <div className="form-group full-width">
+                 <label>Description</label>
+                 <textarea name="description" value={editingProject.description || ''} onChange={handleEditInputChange} />
+               </div>
+               <div className="form-grid">
+                 <div className="form-group full-width">
+                   <label>Start Date</label>
+                   <input type="date" name="start_date" value={editingProject.start_date || ''} onChange={handleEditInputChange} />
+                 </div>
+                 <div className="form-group full-width">
+                   <label>End Date</label>
+                   <input type="date" name="end_date" value={editingProject.end_date || ''} onChange={handleEditInputChange} />
+                 </div>
+               </div>
+               
+               <div className="form-group full-width">
+                 <label>Assigned Developers</label>
+                 <div className="assignee-tags-container" style={{ border: '1px solid #e5e5ea', padding: '10px', borderRadius: '8px' }}>
+                   {developers.map(dev => (
+                     <span 
+                       key={dev.id} 
+                       className={`assignee-tag ${(editingProject.team || []).includes(dev.name) ? 'selected' : ''}`}
+                       onClick={() => toggleEditProjectDeveloper(dev.name)}
+                     >
+                       {dev.name}
+                     </span>
+                   ))}
+                 </div>
+               </div>
+
+               <div className="modal-actions">
+                 <button type="button" className="btn-cancel" onClick={() => setIsEditing(false)}>Cancel</button>
+                 <button type="submit" className="btn-save">Save Changes</button>
+               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Edit Developer Modal */}
       {isEditingDeveloper && editingDeveloper && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Edit Developer</h3>
+            <h3>Edit Developer Profile</h3>
             <form onSubmit={handleUpdateDeveloper}>
               <div className="form-grid">
                 <div className="form-group full-width">
                   <label>Developer Name *</label>
                   <input type="text" name="name" value={editingDeveloper.name} onChange={handleEditDeveloperInputChange} required />
                 </div>
+                
+                <div className="form-group full-width">
+                  <label>Role</label>
+                  <select value={editingDeveloper.role || ''} onChange={(e) => handleRoleSelect(e, 'edit')} style={{width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #ccc'}}>
+                    <option value="" disabled>Select a Role...</option>
+                    {availableRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                    <option value="ADD_NEW_ROLE" style={{fontWeight: 'bold', color: '#007aff'}}>+ Add New Role...</option>
+                  </select>
+                </div>
+
                 <div className="form-group full-width">
                   <label>Email</label>
                   <input type="email" name="email" value={editingDeveloper.email || ''} onChange={handleEditDeveloperInputChange} />
-                </div>
-                <div className="form-group full-width">
-                  <label>Role</label>
-                  <input type="text" name="role" value={editingDeveloper.role || ''} onChange={handleEditDeveloperInputChange} />
                 </div>
               </div>
               <div className="modal-actions">

@@ -1,37 +1,39 @@
+// src/components/SprintMaster.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import './SprintTracker.css';
 
-const SprintMaster = () => {
+const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
   const [tasks, setTasks] = useState([]);
   const [developers, setDevelopers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Dynamic Sprints and Phases Arrays
   const [sprints, setSprints] = useState(['[S1] Design and Requirements', '[S2] Adjustment and Onboarding']);
-  const [phases, setPhases] = useState(['Initiation', '[P1] Prerequisites', 'Development', 'Testing']);
   const fibonacciPoints = [1, 2, 3, 5, 8, 13]; 
   
-  // Row Editing & Temporary State Logic
   const [editingRowId, setEditingRowId] = useState(null);
   const [originalTaskData, setOriginalTaskData] = useState(null); 
   
-  // UI & Modal States
   const tableContainerRef = useRef(null);
   const [assigneePopover, setAssigneePopover] = useState(null); 
   const [floatingPrompt, setFloatingPrompt] = useState({ isOpen: false, type: '', taskId: null });
   const [promptValue, setPromptValue] = useState('');
   
-  // Cleaned Custom Modals
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
   const [deletePrompt, setDeletePrompt] = useState({ isOpen: false, taskId: null });
+  const [isPhaseManagerOpen, setIsPhaseManagerOpen] = useState(false);
 
-  // Filter States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ sprint: '', taskName: '', assignees: [], phase: '', points: '', priority: '', status: '' });
   const [filterPos, setFilterPos] = useState({ x: window.innerWidth - 350, y: 120 });
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
+
+  const overlayStyle = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 99999, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)'
+  };
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -39,14 +41,8 @@ const SprintMaster = () => {
       setFilterPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
     };
     const handleMouseUp = () => setIsDragging(false);
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    }
+    if (isDragging) { window.addEventListener('mousemove', handleMouseMove); window.addEventListener('mouseup', handleMouseUp); }
+    return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); }
   }, [isDragging]);
 
   const handleDragStart = (e) => {
@@ -54,7 +50,7 @@ const SprintMaster = () => {
     dragOffset.current = { x: e.clientX - filterPos.x, y: e.clientY - filterPos.y };
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (selectedProject) fetchData(); }, [selectedProject]);
 
   const fetchData = async () => {
     try {
@@ -62,13 +58,11 @@ const SprintMaster = () => {
       const { data: devData } = await supabase.from('developers').select('*');
       if (devData) setDevelopers(devData.map(dev => dev.name));
 
-      const { data: taskData } = await supabase.from('tasks').select('*').order('id', { ascending: true });
+      // ONLY fetch from `tasks` table
+      const { data: taskData } = await supabase.from('tasks').select('*').eq('project_id', selectedProject.id).order('id', { ascending: true });
       if (taskData) {
         const uniqueSprints = [...new Set(taskData.map(t => t.sprint).filter(Boolean))];
         setSprints(prev => Array.from(new Set([...prev, ...uniqueSprints])));
-        
-        const uniquePhases = [...new Set(taskData.map(t => t.phase).filter(Boolean))];
-        setPhases(prev => Array.from(new Set([...prev, ...uniquePhases])));
 
         setTasks(taskData.map(t => ({
           id: t.id, sprint: t.sprint || '', taskName: t.task_name || '', assignees: t.assignees || [], 
@@ -121,29 +115,42 @@ const SprintMaster = () => {
     } else handleTaskChange(id, 'phase', value);
   };
 
-  const submitFloatingPrompt = () => {
+  const submitFloatingPrompt = async () => {
     if (!promptValue.trim()) return; 
     if (floatingPrompt.type === 'sprint') {
       setSprints(prev => [...prev, promptValue]);
       handleTaskChange(floatingPrompt.taskId, 'sprint', promptValue);
     } else if (floatingPrompt.type === 'phase') {
-      setPhases(prev => [...prev, promptValue]);
-      handleTaskChange(floatingPrompt.taskId, 'phase', promptValue);
+      try {
+        const { data, error } = await supabase.from('phases').insert([{ project_id: selectedProject.id, name: promptValue }]).select();
+        if (error) throw error;
+        if (data && data.length > 0) {
+          await fetchPhases(); // Sync global phases prop
+          handleTaskChange(floatingPrompt.taskId, 'phase', data[0].name);
+        }
+      } catch (err) { alert(`Error creating phase: ${err.message}`); }
     }
     setFloatingPrompt({ isOpen: false, type: '', taskId: null });
+  };
+
+  const handleDeletePhase = async (phaseId) => {
+    if (window.confirm("Delete this phase? Tasks using it might lose their phase mapping.")) {
+      try {
+        await supabase.from('phases').delete().eq('id', phaseId);
+        await fetchPhases(); // Sync global phases prop
+      } catch (err) { alert(`Error deleting phase: ${err.message}`); }
+    }
   };
 
   const addNewTaskRow = () => {
     const tempId = `temp_${Date.now()}`;
     const newTaskData = { 
       id: tempId, isNew: true, sprint: sprints[0] || '', taskName: '', assignees: [], 
-      phase: phases[0] || '', storyPoints: 1, priority: 'Medium', status: 'To Do', notes: '' 
+      phase: phases && phases.length > 0 ? phases[0].name : '', storyPoints: 1, priority: 'Medium', status: 'To Do', notes: '' 
     };
-    
     setTasks([...tasks, newTaskData]);
     setEditingRowId(tempId);
     setOriginalTaskData(null);
-    
     setTimeout(() => {
       if (tableContainerRef.current) tableContainerRef.current.scrollTo({ top: tableContainerRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
@@ -156,24 +163,22 @@ const SprintMaster = () => {
 
   const cancelEditingRow = (id) => {
     const task = tasks.find(t => t.id === id);
-    if (task.isNew) {
-      setTasks(tasks.filter(t => t.id !== id));
-    } else {
-      setTasks(tasks.map(t => t.id === id ? originalTaskData : t));
-    }
+    if (task.isNew) setTasks(tasks.filter(t => t.id !== id));
+    else setTasks(tasks.map(t => t.id === id ? originalTaskData : t));
+    
     setEditingRowId(null);
     setOriginalTaskData(null);
   };
 
   const saveRow = async (id) => {
     const taskToUpdate = tasks.find(t => t.id === id);
-    
     if (!taskToUpdate.sprint || !taskToUpdate.taskName.trim() || !taskToUpdate.phase || !taskToUpdate.priority || !taskToUpdate.status) {
       setAlertModal({ isOpen: true, title: 'Missing Required Fields', message: 'Please fill out all required fields: Sprint, Task Name, Phase, Priority, and Status.' });
       return; 
     }
 
     const dbPayload = { 
+      project_id: selectedProject.id,
       sprint: taskToUpdate.sprint, task_name: taskToUpdate.taskName, assignees: taskToUpdate.assignees, 
       phase: taskToUpdate.phase, story_points: taskToUpdate.storyPoints, priority: taskToUpdate.priority, 
       status: taskToUpdate.status, notes: taskToUpdate.notes 
@@ -183,7 +188,6 @@ const SprintMaster = () => {
       if (taskToUpdate.isNew) {
         const { data, error } = await supabase.from('tasks').insert([dbPayload]).select();
         if (error) throw error;
-        
         if (data && data.length > 0) {
           const newDbTask = data[0];
           setTasks(tasks.map(t => t.id === id ? { 
@@ -218,128 +222,104 @@ const SprintMaster = () => {
   };
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#8e8e93' }}>Loading Data...</div>;
-
   const activeFilterCount = (Object.values(filters).filter(v => typeof v === 'string' ? v !== '' : v.length > 0)).length;
 
   return (
     <div className="sprint-tracker-view">
       
-      {/* 1. Validation Error Custom Modal */}
+      {/* MANAGE PHASES MODAL */}
+      {isPhaseManagerOpen && (
+        <div style={overlayStyle}>
+          <div className="alert-modal-card" style={{ width: '400px', background: '#fff', padding: '24px', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+            <h4 style={{ color: '#1c1c1e', margin: '0 0 16px 0', fontSize: '1.2rem', textAlign: 'center' }}>Manage Phases</h4>
+            <div style={{ maxHeight: '250px', overflowY: 'auto', textAlign: 'left', marginBottom: '16px' }}>
+              {(!phases || phases.length === 0) && <p style={{color: '#8e8e93', textAlign: 'center'}}>No phases yet.</p>}
+              {phases && phases.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 8px', borderBottom: '1px solid #eee' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#1c1c1e' }}>{p.name}</span>
+                  <button onClick={() => handleDeletePhase(p.id)} style={{ color: '#ff3b30', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>✕ Delete</button>
+                </div>
+              ))}
+            </div>
+            <button style={{width: '100%', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer'}} onClick={() => setIsPhaseManagerOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* VALIDATION ALERT */}
       {alertModal.isOpen && (
-        <div className="modal-overlay-centered">
-          <div className="alert-modal-card">
+        <div style={overlayStyle}>
+          <div className="alert-modal-card" style={{ width: '340px', padding: '24px', background: '#fff', borderRadius: '16px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
             <h4 style={{ color: '#1c1c1e', margin: '0 0 12px 0', fontSize: '1.2rem' }}>{alertModal.title}</h4>
             <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 24px 0', lineHeight: '1.5' }}>{alertModal.message}</p>
-            <div className="modal-buttons-row">
-              <button className="btn-gradient" onClick={() => setAlertModal({ isOpen: false, title: '', message: '' })}>Got it</button>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }} onClick={() => setAlertModal({ isOpen: false, title: '', message: '' })}>Got it</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Delete Confirmation Custom Modal */}
+      {/* STRICTLY EQUAL DELETE CONFIRMATION MODAL */}
       {deletePrompt.isOpen && (
-        <div className="modal-overlay-centered">
-          <div className="alert-modal-card" style={{ borderTop: '4px solid #ff3b30' }}>
+        <div style={overlayStyle}>
+          <div className="alert-modal-card" style={{ width: '340px', padding: '24px', background: '#fff', borderRadius: '16px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)', borderTop: '4px solid #ff3b30' }}>
             <h4 style={{ color: '#1c1c1e', margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Task</h4>
             <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 24px 0', lineHeight: '1.5' }}>Are you sure? This action cannot be undone.</p>
-            <div className="modal-buttons-row">
-              <button className="ios-button-secondary" onClick={() => setDeletePrompt({ isOpen: false, taskId: null })}>Cancel</button>
-              <button className="btn-gradient" style={{ background: 'linear-gradient(135deg, #ff3b30 0%, #ff2d55 100%)' }} onClick={confirmDeleteTask}>Delete</button>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button 
+                onClick={() => setDeletePrompt({ isOpen: false, taskId: null })}
+                style={{ flex: '1 1 0', padding: '12px', background: '#e5e5ea', color: '#1c1c1e', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeleteTask}
+                style={{ flex: '1 1 0', padding: '12px', background: '#ff3b30', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. Add Sprint/Phase Prompt */}
+      {/* ADD PHASE PROMPT */}
       {floatingPrompt.isOpen && (
-        <div className="floating-prompt-panel">
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', textAlign: 'center' }}>Add New {floatingPrompt.type === 'sprint' ? 'Sprint' : 'Phase'}</h4>
-          <input type="text" autoFocus className="ios-table-input" placeholder={`Enter ${floatingPrompt.type} name...`} value={promptValue} onChange={(e) => setPromptValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitFloatingPrompt()} />
-          <div className="floating-prompt-actions">
-            <button className="ios-button-secondary" onClick={() => setFloatingPrompt({ isOpen: false, type: '', taskId: null })}>Cancel</button>
-            <button className="btn-gradient" onClick={submitFloatingPrompt}>Add</button>
+        <div style={overlayStyle}>
+          <div style={{ width: '320px', padding: '24px', background: '#fff', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', textAlign: 'center', color: '#1c1c1e' }}>Add New {floatingPrompt.type === 'sprint' ? 'Sprint' : 'Phase'}</h4>
+            <input type="text" autoFocus className="ios-table-input" placeholder={`Enter ${floatingPrompt.type} name...`} value={promptValue} onChange={(e) => setPromptValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitFloatingPrompt()} />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+              <button style={{ flex: '1 1 0', padding: '12px', background: '#e5e5ea', color: '#1c1c1e', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }} onClick={() => setFloatingPrompt({ isOpen: false, type: '', taskId: null })}>Cancel</button>
+              <button style={{ flex: '1 1 0', padding: '12px', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }} onClick={submitFloatingPrompt}>Add</button>
+            </div>
           </div>
         </div>
       )}
 
       <div className="tracker-header-row">
         <h2 className="tracker-title">Sprint Master</h2>
-        
         <div className="tracker-actions-wrapper">
-          <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="ios-button-secondary">
-            Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-          </button>
+          <button onClick={() => setIsPhaseManagerOpen(true)} className="ios-button-secondary">Manage Phases</button>
+          <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="ios-button-secondary">Filters {activeFilterCount > 0 && `(${activeFilterCount})`}</button>
           <button onClick={addNewTaskRow} className="btn-gradient">+ Add Task</button>
 
-          {/* Draggable Floating Filter Panel */}
           {isFilterOpen && (
             <div className="filter-panel" style={{ left: filterPos.x, top: filterPos.y }}>
               <div className="filter-header" onMouseDown={handleDragStart}>
                 <h4>Filter Tasks</h4>
-                {activeFilterCount > 0 && (
-                  <button className="filter-clear-btn" onMouseDown={(e) => { e.stopPropagation(); clearFilters(); }}>Clear All</button>
-                )}
+                {activeFilterCount > 0 && <button className="filter-clear-btn" onMouseDown={(e) => { e.stopPropagation(); clearFilters(); }}>Clear All</button>}
               </div>
-              
               <div className="filter-body">
-                <div className="filter-group">
-                  <label>Task Name</label>
-                  <input type="text" className="ios-table-input" placeholder="Search text..." value={filters.taskName} onChange={(e) => handleFilterChange('taskName', e.target.value)} />
-                </div>
-                
-                <div className="filter-group">
-                  <label>Sprint</label>
-                  <select className="ios-table-select" value={filters.sprint} onChange={(e) => handleFilterChange('sprint', e.target.value)}>
-                    <option value="">All Sprints</option>
-                    {sprints.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                <div className="filter-group">
-                  <label>Phase</label>
-                  <select className="ios-table-select" value={filters.phase} onChange={(e) => handleFilterChange('phase', e.target.value)}>
-                    <option value="">All Phases</option>
-                    {phases.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-
-                <div className="filter-group">
-                  <label>Assignee(s)</label>
-                  <div className="assignee-tags-container">
-                    {developers.map(dev => (
-                      <span key={dev} className={`assignee-tag ${filters.assignees.includes(dev) ? 'selected' : ''}`} onClick={() => toggleFilterAssignee(dev)}>
-                        {dev}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
+                <div className="filter-group"><label>Task Name</label><input type="text" className="ios-table-input" placeholder="Search text..." value={filters.taskName} onChange={(e) => handleFilterChange('taskName', e.target.value)} /></div>
+                <div className="filter-group"><label>Sprint</label><select className="ios-table-select" value={filters.sprint} onChange={(e) => handleFilterChange('sprint', e.target.value)}><option value="">All Sprints</option>{sprints.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                <div className="filter-group"><label>Phase</label><select className="ios-table-select" value={filters.phase} onChange={(e) => handleFilterChange('phase', e.target.value)}><option value="">All Phases</option>{phases && phases.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select></div>
+                <div className="filter-group"><label>Assignee(s)</label><div className="assignee-tags-container">{developers.map(dev => <span key={dev} className={`assignee-tag ${filters.assignees.includes(dev) ? 'selected' : ''}`} onClick={() => toggleFilterAssignee(dev)}>{dev}</span>)}</div></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div className="filter-group">
-                    <label>Points</label>
-                    <select className="ios-table-select" value={filters.points} onChange={(e) => handleFilterChange('points', e.target.value)}>
-                      <option value="">All</option>
-                      {fibonacciPoints.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-                  <div className="filter-group">
-                    <label>Priority</label>
-                    <select className="ios-table-select" value={filters.priority} onChange={(e) => handleFilterChange('priority', e.target.value)}>
-                      <option value="">All</option>
-                      <option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>
-                    </select>
-                  </div>
+                  <div className="filter-group"><label>Points</label><select className="ios-table-select" value={filters.points} onChange={(e) => handleFilterChange('points', e.target.value)}><option value="">All</option>{fibonacciPoints.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                  <div className="filter-group"><label>Priority</label><select className="ios-table-select" value={filters.priority} onChange={(e) => handleFilterChange('priority', e.target.value)}><option value="">All</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></div>
                 </div>
-
-                <div className="filter-group">
-                  <label>Status</label>
-                  <select className="ios-table-select" value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
-                    <option value="">All</option>
-                    <option value="To Do">To Do</option><option value="In Progress">In Progress</option><option value="Blocked">Blocked</option><option value="Done">Done</option>
-                  </select>
-                </div>
-
+                <div className="filter-group"><label>Status</label><select className="ios-table-select" value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}><option value="">All</option><option value="To Do">To Do</option><option value="In Progress">In Progress</option><option value="Blocked">Blocked</option><option value="Done">Done</option></select></div>
                 <button className="ios-button-secondary" style={{ width: '100%', marginTop: '8px' }} onClick={() => setIsFilterOpen(false)}>Close Filters</button>
               </div>
             </div>
@@ -351,17 +331,7 @@ const SprintMaster = () => {
         <table className="ios-table tracker-table">
           <thead>
             <tr>
-              <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-              <th style={{ width: '220px' }}>Sprint</th>
-              <th>Task Name</th>
-              <th style={{ width: '200px' }}>Assignee(s)</th>
-              <th style={{ width: '150px' }}>Phase</th>
-              <th style={{ width: '90px', textAlign: 'center', paddingRight: '20px' }}>Points</th>
-              <th style={{ width: '110px', textAlign: 'center' }}>Priority</th>
-              <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
-              <th>Notes</th>
-              {/* FIXED: Min-width strictly applied so action buttons never get cut off */}
-              <th style={{ width: '180px', minWidth: '180px', textAlign: 'center' }}>Actions</th>
+              <th style={{ width: '40px', textAlign: 'center' }}>#</th><th style={{ width: '220px' }}>Sprint</th><th>Task Name</th><th style={{ width: '200px' }}>Assignee(s)</th><th style={{ width: '150px' }}>Phase</th><th style={{ width: '90px', textAlign: 'center', paddingRight: '20px' }}>Points</th><th style={{ width: '110px', textAlign: 'center' }}>Priority</th><th style={{ width: '120px', textAlign: 'center' }}>Status</th><th>Notes</th><th style={{ width: '180px', minWidth: '180px', textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -373,96 +343,25 @@ const SprintMaster = () => {
                 return (
                   <tr key={task.id} className={isEditing ? "row-editing" : ""}>
                     <td style={{ textAlign: 'center', fontWeight: '500', color: '#8e8e93' }}>{index + 1}</td>
-                    
-                    <td>
-                      {isEditing ? (
-                        <select value={task.sprint} onChange={(e) => handleSprintSelectChange(task.id, e.target.value)} className="ios-table-select">
-                          <option value="" disabled>Select Sprint</option>
-                          {sprints.map(s => <option key={s} value={s}>{s}</option>)}
-                          <option value="ADD_NEW_OPTION" className="add-new-option-item">+ Add New Sprint...</option>
-                        </select>
-                      ) : ( <span className="static-cell-text">{task.sprint}</span> )}
-                    </td>
-
-                    <td>
-                      {isEditing ? (
-                        <textarea rows={1} placeholder="Required" value={task.taskName} onChange={(e) => handleTaskChange(task.id, 'taskName', e.target.value)} onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; }} className={`ios-table-textarea ${!task.taskName ? 'input-error' : ''}`} />
-                      ) : ( <span className="static-cell-text font-semibold">{task.taskName || '—'}</span> )}
-                    </td>
-
+                    <td>{isEditing ? <select value={task.sprint} onChange={(e) => handleSprintSelectChange(task.id, e.target.value)} className="ios-table-select"><option value="" disabled>Select Sprint</option>{sprints.map(s => <option key={s} value={s}>{s}</option>)}<option value="ADD_NEW_OPTION" className="add-new-option-item">+ Add New Sprint...</option></select> : <span className="static-cell-text">{task.sprint}</span>}</td>
+                    <td>{isEditing ? <textarea rows={1} placeholder="Required" value={task.taskName} onChange={(e) => handleTaskChange(task.id, 'taskName', e.target.value)} onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; }} className={`ios-table-textarea ${!task.taskName ? 'input-error' : ''}`} /> : <span className="static-cell-text font-semibold">{task.taskName || '—'}</span>}</td>
                     <td style={{ position: 'relative' }}>
                       {isEditing ? (
-                        <div className="assignee-tags-container">
-                          {developers.map(dev => (
-                            <span key={dev} className={`assignee-tag ${task.assignees.includes(dev) ? 'selected' : ''}`} onClick={() => handleAssigneeToggle(task.id, dev, task.assignees)}>
-                              {dev}
-                            </span>
-                          ))}
-                        </div>
+                        <div className="assignee-tags-container">{developers.map(dev => <span key={dev} className={`assignee-tag ${task.assignees.includes(dev) ? 'selected' : ''}`} onClick={() => handleAssigneeToggle(task.id, dev, task.assignees)}>{dev}</span>)}</div>
                       ) : ( 
                         <div className="assignee-tags-container">
                           {task.assignees.length === 0 && <span style={{color: '#8e8e93', fontSize: '0.85rem'}}>Unassigned</span>}
                           {task.assignees.slice(0, 2).map(dev => <span key={dev} className="assignee-tag view-only">{dev}</span>)}
-                          {task.assignees.length > 2 && (
-                            <span className="assignee-tag view-only more-tag" onClick={(e) => { e.stopPropagation(); setAssigneePopover(assigneePopover === task.id ? null : task.id); }}>
-                              ...
-                            </span>
-                          )}
-                          {assigneePopover === task.id && (
-                            <div className="assignee-popover">
-                              <div className="popover-header">
-                                <span>All Assignees</span>
-                                <button onClick={() => setAssigneePopover(null)}>×</button>
-                              </div>
-                              <div className="assignee-tags-container">
-                                {task.assignees.map(dev => <span key={dev} className="assignee-tag view-only">{dev}</span>)}
-                              </div>
-                            </div>
-                          )}
+                          {task.assignees.length > 2 && <span className="assignee-tag view-only more-tag" onClick={(e) => { e.stopPropagation(); setAssigneePopover(assigneePopover === task.id ? null : task.id); }}>...</span>}
+                          {assigneePopover === task.id && <div className="assignee-popover"><div className="popover-header"><span>All Assignees</span><button onClick={() => setAssigneePopover(null)}>×</button></div><div className="assignee-tags-container">{task.assignees.map(dev => <span key={dev} className="assignee-tag view-only">{dev}</span>)}</div></div>}
                         </div>
                       )}
                     </td>
-
-                    <td>
-                      {isEditing ? (
-                        <select value={task.phase} onChange={(e) => handlePhaseSelectChange(task.id, e.target.value)} className="ios-table-select">
-                          <option value="" disabled>Select Phase</option>
-                          {phases.map(p => <option key={p} value={p}>{p}</option>)}
-                          <option value="ADD_NEW_OPTION" className="add-new-option-item">+ Add New Phase...</option>
-                        </select>
-                      ) : ( <span className="static-cell-text">{task.phase}</span> )}
-                    </td>
-
-                    <td style={{ textAlign: 'center', paddingRight: '20px' }}>
-                      {isEditing ? (
-                        <select value={task.storyPoints} onChange={(e) => handleTaskChange(task.id, 'storyPoints', parseInt(e.target.value))} className="ios-table-select" style={{textAlign: 'center'}}>
-                          {fibonacciPoints.map(pts => <option key={pts} value={pts}>{pts}</option>)}
-                        </select>
-                      ) : ( <span className="static-cell-text badge-count">{task.storyPoints}</span> )}
-                    </td>
-
-                    <td style={{ textAlign: 'center' }}>
-                      {isEditing ? (
-                        <select value={task.priority} onChange={(e) => handleTaskChange(task.id, 'priority', e.target.value)} className="ios-table-select">
-                          <option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>
-                        </select>
-                      ) : ( <span className={`ios-badge priority-${task.priority.toLowerCase()}`}>{task.priority}</span> )}
-                    </td>
-
-                    <td style={{ textAlign: 'center' }}>
-                      {isEditing ? (
-                        <select value={task.status} onChange={(e) => handleTaskChange(task.id, 'status', e.target.value)} className="ios-table-select">
-                          <option value="To Do">To Do</option><option value="In Progress">In Progress</option><option value="Blocked">Blocked</option><option value="Done">Done</option>
-                        </select>
-                      ) : ( <span className={`ios-badge status-${task.status.toLowerCase().replace(' ', '-')}`}>{task.status}</span> )}
-                    </td>
-
-                    <td>
-                      {isEditing ? (
-                        <textarea rows={1} placeholder="Optional" value={task.notes} onChange={(e) => handleTaskChange(task.id, 'notes', e.target.value)} onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; }} className="ios-table-textarea" />
-                      ) : ( <span className="static-cell-text notes-text">{task.notes || '—'}</span> )}
-                    </td>
-
+                    <td>{isEditing ? <select value={task.phase} onChange={(e) => handlePhaseSelectChange(task.id, e.target.value)} className="ios-table-select"><option value="" disabled>Select Phase</option>{phases && phases.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}<option value="ADD_NEW_OPTION" className="add-new-option-item">+ Add New Phase...</option></select> : <span className="static-cell-text">{task.phase}</span>}</td>
+                    <td style={{ textAlign: 'center', paddingRight: '20px' }}>{isEditing ? <select value={task.storyPoints} onChange={(e) => handleTaskChange(task.id, 'storyPoints', parseInt(e.target.value))} className="ios-table-select" style={{textAlign: 'center'}}>{fibonacciPoints.map(pts => <option key={pts} value={pts}>{pts}</option>)}</select> : <span className="static-cell-text badge-count">{task.storyPoints}</span>}</td>
+                    <td style={{ textAlign: 'center' }}>{isEditing ? <select value={task.priority} onChange={(e) => handleTaskChange(task.id, 'priority', e.target.value)} className="ios-table-select"><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select> : <span className={`ios-badge priority-${(task.priority || 'Medium').toLowerCase()}`}>{task.priority}</span>}</td>
+                    <td style={{ textAlign: 'center' }}>{isEditing ? <select value={task.status} onChange={(e) => handleTaskChange(task.id, 'status', e.target.value)} className="ios-table-select"><option value="To Do">To Do</option><option value="In Progress">In Progress</option><option value="Blocked">Blocked</option><option value="Done">Done</option></select> : <span className={`ios-badge status-${(task.status || 'To Do').toLowerCase().replace(' ', '-')}`}>{task.status}</span>}</td>
+                    <td>{isEditing ? <textarea rows={1} placeholder="Optional" value={task.notes} onChange={(e) => handleTaskChange(task.id, 'notes', e.target.value)} onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; }} className="ios-table-textarea" /> : <span className="static-cell-text notes-text">{task.notes || '—'}</span>}</td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-button-group">
                         {isEditing ? (

@@ -371,38 +371,76 @@
   color: #ff3b30;
 }
 
+.tasks-table th.actions-header,
+.tasks-table td.actions {
+  text-align: center;
+}
+
 .actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem 0;
-  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle;
 }
 
 .btn-edit,
+.btn-save,
+.btn-cancel,
 .btn-delete {
-  padding: 0.2rem 0.4rem;
-  font-size: 0.7rem;
-  width: 100%;
-  max-width: 50px;
-  white-space: nowrap;
+  padding: 0.4rem 0.8rem !important;
+  font-size: 0.8rem !important;
+  white-space: nowrap !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  margin: 0 !important;
+  outline: none !important;
+  width: auto !important;
+  max-width: none !important;
 }
 
 .btn-edit {
-  background: rgba(0, 122, 255, 0.12);
-  color: #007aff;
+  background: rgba(0, 122, 255, 0.12) !important;
+  color: #007aff !important;
 }
 
 .btn-edit:hover {
-  background: rgba(0, 122, 255, 0.2);
+  background: rgba(0, 122, 255, 0.2) !important;
+  transform: scale(0.98) !important;
+}
+
+.btn-save {
+  background: #007aff !important;
+  color: white !important;
+}
+
+.btn-save:hover {
+  background: #005fc9 !important;
+  transform: scale(0.98) !important;
+}
+
+.btn-cancel {
+  background: #f2f2f7 !important;
+  color: #8e8e93 !important;
+}
+
+.btn-cancel:hover {
+  background: #e5e5ea !important;
+  transform: scale(0.98) !important;
 }
 
 .btn-delete {
-  background: rgba(255, 59, 48, 0.12);
-  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.12) !important;
+  color: #ff3b30 !important;
 }
 
 .btn-delete:hover {
-  background: rgba(255, 59, 48, 0.2);
+  background: rgba(255, 59, 48, 0.2) !important;
+  transform: scale(0.98) !important;
 }
 
 .create-new-option {

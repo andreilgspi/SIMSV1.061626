@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../supabaseClient';
 import './workbook.css';
 
 const OWNERS = ['PM', 'UI UX', 'Team', 'KC', 'Jess', 'Franco', 'Mayon', 'Rica, QA 2'];
 const STATUSES = ['Not Started', 'In Progress', 'On Hold', 'Complete', 'Cancelled'];
 
 function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
+  const [editingRowId, setEditingRowId] = useState(null);
   const [lastPhaseId, setLastPhaseId] = useState(null);
   const [isCreatingNewPhase, setIsCreatingNewPhase] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
@@ -14,6 +14,9 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
   const [isOwnerFilterOpen, setIsOwnerFilterOpen] = useState(false);
   const ownerFilterRef = useRef(null);
   const [isMilestoneMode, setIsMilestoneMode] = useState(false);
+  const [isPhaseManagerOpen, setIsPhaseManagerOpen] = useState(false);
+  const [formError, setFormError] = useState('');
+  
   const [formData, setFormData] = useState({
     project_id: selectedProject ? selectedProject.id : null,
     phase_id: null,
@@ -30,6 +33,12 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
     is_milestone: 0
   });
 
+  const overlayStyle = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 99999, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', padding: '20px'
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (ownerFilterRef.current && !ownerFilterRef.current.contains(e.target)) {
@@ -40,49 +49,38 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Generate task ID based on phase and existing tasks
   const getNextPhaseNumber = () => {
-  const phaseNumbers = phases.map(p => {
-    const match = p.name.match(/\[P(\d+)\]/);
-    return match ? parseInt(match[1]) : 0;
-  });
-  return Math.max(...phaseNumbers, 0) + 1;
+    const phaseNumbers = phases.map(p => {
+      const match = p.name.match(/\[P(\d+)\]/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    return Math.max(...phaseNumbers, 0) + 1;
   };
 
   const generateTaskId = (phaseId) => {
-  if (!phaseId) return '';
-  const phase = phases.find(p => p.id === phaseId);
-  if (!phase) return '';
-
-  const phaseMatch = phase.name.match(/\[P(\d+)\]/);
-  const phaseNumber = phaseMatch ? parseInt(phaseMatch[1]) : 1;
-
-  const phaseTasks = tasks.filter(t => t.phase_id === phaseId);
-
-  if (phaseTasks.length === 0) return String(phaseNumber);
-
-  return `${phaseNumber}.${phaseTasks.length + 1}`;
-};
+    if (!phaseId) return '';
+    const phase = phases.find(p => p.id === phaseId);
+    if (!phase) return '';
+    const phaseMatch = phase.name.match(/\[P(\d+)\]/);
+    const phaseNumber = phaseMatch ? parseInt(phaseMatch[1]) : 1;
+    const phaseTasks = tasks.filter(t => t.phase_id === phaseId);
+    if (phaseTasks.length === 0) return String(phaseNumber);
+    return `${phaseNumber}.${phaseTasks.length + 1}`;
+  };
 
   useEffect(() => {
-    if (formData.phase_id && !editingTask) {
+    if (formData.phase_id && editingRowId === 'new') {
       const newTaskId = generateTaskId(formData.phase_id);
       setFormData(prev => ({ ...prev, task_id: newTaskId }));
     }
-  }, [formData.phase_id, tasks, phases, editingTask]);
+  }, [formData.phase_id, tasks, phases, editingRowId]);
 
- // Changing status enforces the matching percent:
   useEffect(() => {
     setFormData(prev => {
       const { status, percent_complete } = prev;
-      if (status === 'Complete' && percent_complete !== 100) {
-        return { ...prev, percent_complete: 100 };
-      }
-      if (status === 'Not Started' && percent_complete !== 0) {
-        return { ...prev, percent_complete: 0 };
-      }
-      if ((status === 'On Hold' || status === 'In Progress') &&
-          (percent_complete === 0 || percent_complete === 100)) {
+      if (status === 'Complete' && percent_complete !== 100) return { ...prev, percent_complete: 100 };
+      if (status === 'Not Started' && percent_complete !== 0) return { ...prev, percent_complete: 0 };
+      if ((status === 'On Hold' || status === 'In Progress') && (percent_complete === 0 || percent_complete === 100)) {
         return { ...prev, percent_complete: percent_complete === 0 ? 1 : 99 };
       }
       return prev;
@@ -93,14 +91,9 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
     setFormData(prev => {
       const { status, percent_complete } = prev;
       if (status === 'Cancelled') return prev;
-      if (percent_complete === 100 && status !== 'Complete') {
-        return { ...prev, status: 'Complete' };
-      }
-      if (percent_complete === 0 && status !== 'Not Started') {
-        return { ...prev, status: 'Not Started' };
-      }
-      if (percent_complete > 0 && percent_complete < 100 &&
-          (status === 'Complete' || status === 'Not Started')) {
+      if (percent_complete === 100 && status !== 'Complete') return { ...prev, status: 'Complete' };
+      if (percent_complete === 0 && status !== 'Not Started') return { ...prev, status: 'Not Started' };
+      if (percent_complete > 0 && percent_complete < 100 && (status === 'Complete' || status === 'Not Started')) {
         return { ...prev, status: 'In Progress' };
       }
       return prev;
@@ -119,203 +112,146 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
   }, [tasks, phases]);
 
   useEffect(() => {
-    if (selectedProject) {
-      setFormData(prev => ({ ...prev, project_id: selectedProject.id }));
-    }
+    if (selectedProject) setFormData(prev => ({ ...prev, project_id: selectedProject.id }));
   }, [selectedProject]);
 
   useEffect(() => {
-    if (isAdding && lastPhaseId && !editingTask) {
+    if (editingRowId === 'new' && lastPhaseId) {
       setFormData(prev => ({ ...prev, phase_id: lastPhaseId }));
     }
-  }, [isAdding, lastPhaseId, editingTask]);
+  }, [editingRowId, lastPhaseId]);
 
   const handleInputChange = (e) => {
-  const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target;
+    if (name === 'phase_id' && value === 'create-new') {
+      setIsCreatingNewPhase(true);
+      setNewPhaseName('');
+      return;
+    }
+    if (type === 'checkbox') setFormData(prev => ({ ...prev, [name]: checked ? 1 : 0 }));
+    else if (name === 'phase_id') setFormData(prev => ({ ...prev, phase_id: value ? Number(value) : '' }));
+    else if (name === 'percent_complete' || name === 'duration') setFormData(prev => ({ ...prev, [name]: value === '' ? '' : Number(value) }));
+    else setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-  if (name === 'phase_id' && value === 'create-new') {
-    setIsCreatingNewPhase(true);
-    setNewPhaseName('');
-    return;
-  }
-
-  if (type === 'checkbox') {
-    setFormData(prev => ({ ...prev, [name]: checked ? 1 : 0 }));
-  } else if (name === 'phase_id') {
-    setFormData(prev => ({ ...prev, phase_id: value ? Number(value) : '' }));
-  } else if (name === 'percent_complete' || name === 'duration') {
-    setFormData(prev => ({ ...prev, [name]: value === '' ? '' : Number(value) }));
-  } else {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  }
-};
   const resetForm = () => {
     setFormData({
-      project_id: selectedProject ? selectedProject.id : null,
-      phase_id: lastPhaseId,
-      task_id: '',
-      task_name: '',
-      start_date: '',
-      end_date: '',
-      predecessors: '',
-      duration: 1,
-      owner: OWNERS[0],
-      percent_complete: 0,
-      status: 'Not Started',
-      notes: '',
-      is_milestone: 0
+      project_id: selectedProject ? selectedProject.id : null, phase_id: lastPhaseId, task_id: '', task_name: '',
+      start_date: '', end_date: '', predecessors: '', duration: 1, owner: OWNERS[0], percent_complete: 0,
+      status: 'Not Started', notes: '', is_milestone: 0
     });
-    setIsAdding(false);
-    setEditingTask(null);
+    setFormError('');
+    setEditingRowId(null);
     setIsCreatingNewPhase(false);
     setNewPhaseName('');
   };
 
   const handleCreateNewPhase = async () => {
-  if (newPhaseName.trim() && selectedProject) {
-    try {
-      const nextNumber = getNextPhaseNumber();
-      const fullPhaseName = `[P${nextNumber}] ${newPhaseName.trim()}`;
-
-      const response = await fetch('http://localhost:5000/api/phases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_id: selectedProject.id,
-          name: fullPhaseName
-        })
-      });
-
-      if (response.ok) {
-        await fetchPhases();
-        const data = await response.json();
-        setLastPhaseId(data.id);
-        setFormData(prev => ({ ...prev, phase_id: data.id }));
-        setIsCreatingNewPhase(false);
-        setNewPhaseName('');
-      } else {
-        const errorText = await response.text();
-        console.error('Failed to create phase:', response.status, errorText);
-        alert(`Couldn't create phase (HTTP ${response.status}). Check the console for details.`);
-      }
-    } catch (error) {
-      console.error('Error creating phase:', error);
-      alert('Couldn\'t reach the server. Is your backend running on localhost:5000?');
-    }
-  }
-};
-
-const handleDeletePhase = async (phaseId, phaseName) => {
-  const taskCount = tasks.filter(t => t.phase_id === phaseId).length;
-  const message = taskCount > 0
-    ? `"${phaseName}" has ${taskCount} task(s) assigned to it. Deleting it may orphan those tasks. Delete anyway?`
-    : `Delete phase "${phaseName}"?`;
-
-  if (window.confirm(message)) {
-    try {
-      const response = await fetch(`http://localhost:5000/api/phases/${phaseId}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        await fetchPhases();
-        if (formData.phase_id === phaseId) {
-          setFormData(prev => ({ ...prev, phase_id: null }));
+    if (newPhaseName.trim() && selectedProject) {
+      try {
+        const nextNumber = getNextPhaseNumber();
+        const fullPhaseName = `[P${nextNumber}] ${newPhaseName.trim()}`;
+        const { data, error } = await supabase.from('phases').insert([{ project_id: selectedProject.id, name: fullPhaseName }]).select();
+        
+        if (error) throw error;
+        if (data) {
+          await fetchPhases();
+          setLastPhaseId(data[0].id);
+          setFormData(prev => ({ ...prev, phase_id: data[0].id }));
+          setIsCreatingNewPhase(false);
+          setNewPhaseName('');
         }
-        if (lastPhaseId === phaseId) {
-          setLastPhaseId(null);
-        }
-      } else {
-        alert('Could not delete phase.');
-      }
-    } catch (error) {
-      console.error('Error deleting phase:', error);
+      } catch (error) { alert(`Error creating phase: ${error.message}`); }
     }
-  }
-};
+  };
+
+  const handleDeletePhase = async (phaseId, phaseName) => {
+    const taskCount = tasks.filter(t => t.phase_id === phaseId).length;
+    const message = taskCount > 0
+      ? `"${phaseName}" has ${taskCount} task(s) assigned to it. Deleting it may orphan those tasks. Delete anyway?`
+      : `Delete phase "${phaseName}"?`;
+
+    if (window.confirm(message)) {
+      try {
+        const { error } = await supabase.from('phases').delete().eq('id', phaseId);
+        if (error) throw error;
+        await fetchPhases();
+        if (formData.phase_id === phaseId) setFormData(prev => ({ ...prev, phase_id: null }));
+        if (lastPhaseId === phaseId) setLastPhaseId(null);
+      } catch (error) { alert(`Error deleting phase: ${error.message}`); }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    setFormError('');
     if (!validatePredecessors(formData.predecessors)) {
-    return; 
-  }
+      setFormError("Validation Error: Predecessor task is not 'Complete' or does not exist.");
+      return; 
+    }
     
-    const taskData = {
-      ...formData,
-      project_id: selectedProject ? selectedProject.id : null
+    // STRICT SANITIZATION: Forces empty strings to NULL so Postgres doesn't silently crash
+    const taskData = { 
+      project_id: selectedProject ? selectedProject.id : null,
+      phase_id: formData.phase_id || null,
+      task_id: formData.task_id || null,
+      task_name: formData.task_name,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
+      predecessors: formData.predecessors || null,
+      duration: Number(formData.duration) || 1,
+      owner: formData.owner,
+      percent_complete: Number(formData.percent_complete) || 0,
+      status: formData.status,
+      notes: formData.notes,
+      is_milestone: formData.is_milestone ? 1 : 0
     };
     
-    const url = editingTask 
-      ? `http://localhost:5000/api/tasks/${editingTask.id}`
-      : 'http://localhost:5000/api/tasks';
-    
-    const method = editingTask ? 'PUT' : 'POST';
-    
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData)
-      });
-      
-      if (response.ok) {
-        await fetchTasks();
+      if (editingRowId && editingRowId !== 'new') {
+        // ALWAYS targets the 'workbook' table
+        const { error } = await supabase.from('workbook').update(taskData).eq('id', editingRowId);
+        if (error) throw error;
+        await fetchTasks(); 
+        resetForm();
+      } else {
+        const { error } = await supabase.from('workbook').insert([taskData]);
+        if (error) throw error;
+        await fetchTasks(); 
         resetForm();
       }
-    } catch (error) {
+    } catch (error) { 
       console.error('Error saving task:', error);
+      setFormError(`Database Error: ${error.message}`);
     }
   };
 
   const handleToggleMilestone = async (task) => {
     const updatedTask = { ...task, is_milestone: task.is_milestone ? 0 : 1 };
-    
     try {
-      const response = await fetch(`http://localhost:5000/api/tasks/${task.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTask)
-      });
-      
-      if (response.ok) {
-        await fetchTasks();
-      }
-    } catch (error) {
-      console.error('Error updating milestone:', error);
-    }
+      const { error } = await supabase.from('workbook').update({ is_milestone: updatedTask.is_milestone }).eq('id', task.id);
+      if (!error) await fetchTasks();
+    } catch (error) { alert(`Error updating milestone: ${error.message}`); }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       try {
-        const response = await fetch(`http://localhost:5000/api/tasks/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-          await fetchTasks();
-        }
-      } catch (error) {
-        console.error('Error deleting task:', error);
-      }
+        const { error } = await supabase.from('workbook').delete().eq('id', id);
+        if (!error) await fetchTasks();
+      } catch (error) { alert(`Error deleting task: ${error.message}`); }
     }
   };
 
   const handleEdit = (task) => {
-    setEditingTask(task);
+    setEditingRowId(task.id);
+    setFormError('');
     setFormData({
-      project_id: selectedProject ? selectedProject.id : null,
-      phase_id: task.phase_id,
-      task_id: task.task_id,
-      task_name: task.task_name,
-      start_date: task.start_date,
-      end_date: task.end_date,
-      predecessors: task.predecessors || '',
-      duration: task.duration,
-      owner: task.owner,
-      percent_complete: task.percent_complete,
-      status: task.status,
-      notes: task.notes || '',
-      is_milestone: task.is_milestone || 0
+      project_id: selectedProject ? selectedProject.id : null, phase_id: task.phase_id, task_id: task.task_id,
+      task_name: task.task_name, start_date: task.start_date || '', end_date: task.end_date || '', predecessors: task.predecessors || '',
+      duration: task.duration, owner: task.owner, percent_complete: task.percent_complete, status: task.status,
+      notes: task.notes || '', is_milestone: task.is_milestone || 0
     });
-    setIsAdding(true);
   };
 
   const getPhaseName = (phaseId) => {
@@ -333,60 +269,42 @@ const handleDeletePhase = async (phaseId, phaseName) => {
     const phaseNumber = phaseMatch ? parseInt(phaseMatch[1]) : phase.id;
 
     const palette = [
-      { bg: 'rgba(0, 122, 255, 0.12)',   color: '#007aff' },
-      { bg: 'rgba(52, 199, 89, 0.12)',   color: '#34c759' },
-      { bg: 'rgba(255, 149, 0, 0.12)',   color: '#ff9500' },
-      { bg: 'rgba(255, 59, 48, 0.12)',   color: '#ff3b30' },
-      { bg: 'rgba(88, 86, 214, 0.12)',   color: '#5856d6' },
-      { bg: 'rgba(255, 45, 85, 0.12)',   color: '#ff2d55' },
-      { bg: 'rgba(48, 176, 192, 0.12)',  color: '#30b0c0' },
-      { bg: 'rgba(175, 82, 222, 0.12)',  color: '#af52de' },
-      { bg: 'rgba(100, 210, 255, 0.18)', color: '#0a84ff' },
-      { bg: 'rgba(255, 107, 107, 0.12)', color: '#d63030' },
+      { bg: 'rgba(0, 122, 255, 0.12)',   color: '#007aff' }, { bg: 'rgba(52, 199, 89, 0.12)',   color: '#34c759' },
+      { bg: 'rgba(255, 149, 0, 0.12)',   color: '#ff9500' }, { bg: 'rgba(255, 59, 48, 0.12)',   color: '#ff3b30' },
+      { bg: 'rgba(88, 86, 214, 0.12)',   color: '#5856d6' }, { bg: 'rgba(255, 45, 85, 0.12)',   color: '#ff2d55' },
+      { bg: 'rgba(48, 176, 192, 0.12)',  color: '#30b0c0' }, { bg: 'rgba(175, 82, 222, 0.12)',  color: '#af52de' }
     ];
-
     const { bg, color } = palette[(phaseNumber - 1) % palette.length];
     return { backgroundColor: bg, color };
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const toggleOwnerFilter = (owner) => {
-    setOwnerFilter(prev => 
-      prev.includes(owner) 
-        ? prev.filter(o => o !== owner) 
-        : [...prev, owner]
-    );
-  };
+  const toggleOwnerFilter = (owner) => setOwnerFilter(prev => prev.includes(owner) ? prev.filter(o => o !== owner) : [...prev, owner]);
+  
   const validatePredecessors = (predecessorInput) => {
-  if (!predecessorInput) return true;
-  
-  const predecessors = predecessorInput.split(',').map(s => s.trim());
-  
-  for (const predId of predecessors) {
-    const foundTask = tasks.find(t => t.task_id === predId);
-    
-    // Check if task exists and if it is marked as 'Complete'
-    if (!foundTask || foundTask.status !== 'Complete') {
-      alert(`Validation Error: Predecessor task ${predId} is not 'Complete' or does not exist.`);
-      return false;
+    if (!predecessorInput) return true;
+    const predecessors = predecessorInput.split(',').map(s => s.trim());
+    for (const predId of predecessors) {
+      const foundTask = tasks.find(t => t.task_id === predId);
+      if (!foundTask || foundTask.status !== 'Complete') {
+        alert(`Validation Error: Predecessor task ${predId} is not 'Complete' or does not exist.`);
+        return false;
+      }
     }
-  }
-  return true;
-};
+    return true;
+  };
 
   const clearOwnerFilter = () => setOwnerFilter([]);
+  const sortedTasks = [...tasks].filter(t => ownerFilter.length === 0 || ownerFilter.includes(t.owner)).sort((a, b) => a.id - b.id);
 
-  const sortedTasks = [...tasks]
-    .filter(t => ownerFilter.length === 0 || ownerFilter.includes(t.owner))
-    .sort((a, b) => a.id - b.id);
+
+  const displayTasks = editingRowId === 'new' 
+    ? [...sortedTasks, { id: 'new', isNew: true }] 
+    : sortedTasks;
 
   if (!selectedProject) {
     return (
@@ -401,41 +319,53 @@ const handleDeletePhase = async (phaseId, phaseName) => {
 
   return (
     <div className="workbook">
+      
+      {/* MANAGE PHASES MODAL */}
+      {isPhaseManagerOpen && (
+        <div style={overlayStyle}>
+          <div style={{ width: '400px', padding: '24px', background: '#fff', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+            <h4 style={{ color: '#1c1c1e', margin: '0 0 16px 0', fontSize: '1.2rem', textAlign: 'center' }}>Manage Phases</h4>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input type="text" value={newPhaseName} onChange={(e) => setNewPhaseName(e.target.value)} placeholder="Enter new phase name..." className="ios-table-input" style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc' }} onKeyDown={(e) => e.key === 'Enter' && handleCreateNewPhase()} />
+              <button onClick={handleCreateNewPhase} disabled={!newPhaseName.trim()} style={{ padding: '8px 16px', background: '#007aff', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', opacity: newPhaseName.trim() ? 1 : 0.5 }}>Add Phase</button>
+            </div>
+            <div style={{ maxHeight: '250px', overflowY: 'auto', textAlign: 'left', marginBottom: '16px' }}>
+              {(!phases || phases.length === 0) && <p style={{color: '#8e8e93', textAlign: 'center'}}>No phases yet.</p>}
+              {phases && phases.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 8px', borderBottom: '1px solid #eee' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#1c1c1e' }}>{p.name}</span>
+                  <button onClick={() => handleDeletePhase(p.id, p.name)} style={{ color: '#ff3b30', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>✕ Delete</button>
+                </div>
+              ))}
+            </div>
+            <button style={{width: '100%', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer'}} onClick={() => setIsPhaseManagerOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
       <div className="workbook-header">
         <div>
           <h2>Task Workbook</h2>
           <p className="project-context">{selectedProject.name}</p>
         </div>
         <div className="header-buttons">
-          <button
-          className={`btn-filter${isMilestoneMode ? ' btn-filter-active' : ''}`}
-          onClick={() => setIsMilestoneMode(!isMilestoneMode)}
-        >
-          {isMilestoneMode ? '✓ Done' : 'Milestone'}
+          <button className="btn-filter" onClick={() => setIsPhaseManagerOpen(true)}>Manage Phases</button>
+          <button className={`btn-filter${isMilestoneMode ? ' btn-filter-active' : ''}`} onClick={() => setIsMilestoneMode(!isMilestoneMode)}>
+            {isMilestoneMode ? '✓ Done' : 'Milestone'}
           </button>
-          <div className="owner-filter-wrapper" ref={ownerFilterRef}></div>
           <div className="owner-filter-wrapper" ref={ownerFilterRef}>
-            <button 
-              className="btn-filter"
-              onClick={() => setIsOwnerFilterOpen(!isOwnerFilterOpen)}
-            >
+            <button className="btn-filter" onClick={() => setIsOwnerFilterOpen(!isOwnerFilterOpen)}>
               Filter by Owner {ownerFilter.length > 0 && `(${ownerFilter.length})`}
             </button>
             {isOwnerFilterOpen && (
               <div className="owner-filter-dropdown">
                 <div className="owner-filter-dropdown-header">
                   <span>Select Owners</span>
-                  {ownerFilter.length > 0 && (
-                    <button className="btn-clear-filter" onClick={clearOwnerFilter}>Clear</button>
-                  )}
+                  {ownerFilter.length > 0 && <button className="btn-clear-filter" onClick={clearOwnerFilter}>Clear</button>}
                 </div>
                 {OWNERS.map(owner => (
                   <label key={owner} className="owner-filter-option">
-                    <input 
-                      type="checkbox" 
-                      checked={ownerFilter.includes(owner)}
-                      onChange={() => toggleOwnerFilter(owner)}
-                    />
+                    <input type="checkbox" checked={ownerFilter.includes(owner)} onChange={() => toggleOwnerFilter(owner)}/>
                     <span>{owner}</span>
                   </label>
                 ))}
@@ -443,330 +373,104 @@ const handleDeletePhase = async (phaseId, phaseName) => {
             )}
           </div>
         </div>
-        
       </div>
       
-  
-      {/* Add/Edit Task Bottom Panel */}
-      {isAdding && (
-        <div className="bottom-panel">
-          <div className="bottom-panel-content">
-            <h3>{editingTask ? 'Edit Task' : 'Add New Task'}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Phase *</label>
-                  {!isCreatingNewPhase ? (
-                    <select name="phase_id" value={formData.phase_id || ''} onChange={handleInputChange} required>
-                      <option value="">Select Phase</option>
-                      {phases && phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      <option value="create-new" className="create-new-option">+ Create New Phase</option>
-                    </select>
-                  ) : (
-                    <div className="new-phase-input-group">
-                      <input 
-                        type="text" 
-                        value={newPhaseName} 
-                        onChange={(e) => setNewPhaseName(e.target.value)}
-                        placeholder="Enter new phase name (e.g., [P6] Deployment)"
-                        autoFocus
-                      />
-                      <div className="new-phase-actions">
-                        <button 
-                          type="button" 
-                          className="btn-cancel-small"
-                          onClick={() => {
-                            setIsCreatingNewPhase(false);
-                            setNewPhaseName('');
-                          }}
-                        >
-                          Cancel
-                        </button>
-                        <button 
-                          type="button" 
-                          className="btn-create-small"
-                          onClick={handleCreateNewPhase}
-                          disabled={!newPhaseName.trim()}
-                        >
-                          Create
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Task ID</label>
-                  <input 
-                    type="text" 
-                    name="task_id" 
-                    value={formData.task_id} 
-                    onChange={handleInputChange} 
-                    disabled={!editingTask}
-                    className={!editingTask ? 'auto-generated' : ''}
-                  />
-                  {!editingTask && (
-                    <small className="hint-text">Auto-generated based on phase</small>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Task Name *</label>
-                  <input type="text" name="task_name" value={formData.task_name} onChange={handleInputChange} required />
-                </div>
-                <div className="form-group">
-                  <label>Start Date *</label>
-                  <input type="date" name="start_date" value={formData.start_date} onChange={handleInputChange} required />
-                </div>
-                <div className="form-group">
-                  <label>End Date *</label>
-                  <input type="date" name="end_date" value={formData.end_date} onChange={handleInputChange} required />
-                </div>
-                <div className="form-group">
-                  <label>Predecessors</label>
-                  <input type="text" name="predecessors" value={formData.predecessors} onChange={handleInputChange} placeholder="e.g., 1.23, 1.24" />
-                </div>
-                <div className="form-group">
-                  <label>Hours Duration *</label>
-                  <input type="number" name="duration" value={formData.duration} onChange={handleInputChange} required min="1" />
-                </div>
-                <div className="form-group">
-                  <label>Owner *</label>
-                  <select name="owner" value={formData.owner} onChange={handleInputChange} required>
-                    {OWNERS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>% Complete</label>
-                  <input 
-                    type="number" 
-                    name="percent_complete" 
-                    value={formData.percent_complete} 
-                    onChange={handleInputChange} 
-                    min="0" 
-                    max="100"
-                    disabled={formData.status === 'Complete'}
-                  />
-                  {formData.status === 'Complete' && (
-                    <small className="hint-text">Auto-set to 100% when Complete</small>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Status *</label>
-                  <select name="status" value={formData.status} onChange={handleInputChange} required>
-                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Milestone</label>
-                  <div className="checkbox-group">
-                    <input 
-                      type="checkbox" 
-                      name="is_milestone" 
-                      checked={formData.is_milestone === 1} 
-                      onChange={handleInputChange}
-                    />
-                    <label className="checkbox-label">Mark as Milestone</label>
-                  </div>
-                </div>
-                <div className="form-group full-width">
-                  <label>Notes</label>
-                  <textarea name="notes" value={formData.notes} onChange={handleInputChange} rows="2"></textarea>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={resetForm}>Cancel</button>
-                <button type="submit" className="btn-save">{editingTask ? 'Update' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {tasks.length === 0 && !isAdding ? (
-        <div className="no-tasks-message">
-          <p>No tasks yet for this project.</p>
-          <p>Click <strong>"+ Add New Task"</strong> to get started!</p>
-        </div>
-      ) : sortedTasks.length === 0 && !isAdding ? (
-        <div className="no-tasks-message">
-          <p>No tasks match the selected owner filter.</p>
-          <p><button className="btn-clear-filter" onClick={clearOwnerFilter}>Clear filter</button> to see all tasks.</p>
-        </div>
+      {tasks.length === 0 && editingRowId !== 'new' ? (
+        <div className="no-tasks-message"><p>No tasks yet for this project.</p><p>Click <strong>"+ Add New Task"</strong> to get started!</p></div>
+      ) : sortedTasks.length === 0 && editingRowId !== 'new' ? (
+        <div className="no-tasks-message"><p>No tasks match the selected owner filter.</p><p><button className="btn-clear-filter" onClick={clearOwnerFilter}>Clear filter</button> to see all tasks.</p></div>
       ) : (
-        <div className="tasks-table-container">
-          <table className="tasks-table">
-            <thead>
-              <tr>
-                <th>Phase</th>
-                <th>Task ID</th>
-                <th>Task Name</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Predecessors</th>
-                <th>Hours<br/>Duration</th>
-                <th>Owner</th>
-                <th>% Complete</th>
-                <th>Status</th>
-                <th>Actions</th>
-                {isMilestoneMode && <th>Milestone</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTasks.map((task) => {
-                const phaseStyle = getPhaseStyle(task.phase_id);
-                return (
-                  <tr key={task.id}>
-                    <td>
-                      <span className="phase-button" style={phaseStyle}>
-                        {getPhaseName(task.phase_id)}
-                      </span>
-                    </td>
-                    <td>{task.task_id}</td>
-                    <td>{task.task_name}</td>
-                    <td>{formatDate(task.start_date)}</td>
-                    <td>{formatDate(task.end_date)}</td>
-                    <td>{task.predecessors || '—'}</td>
-                    <td>{task.duration}</td>
-                    <td>{task.owner}</td>
-                    <td>
-                      <div className="progress-bar-cell">
-                        <div className="progress-bar-track">
-                          <div 
-                            className="progress-bar-fill" 
-                            style={{ width: `${task.percent_complete}%` }}
-                          ></div>
+        <>
+          {formError && (
+            <div style={{ background: 'rgba(255, 59, 48, 0.12)', color: '#ff3b30', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem', fontWeight: 500, margin: '0 2rem' }}>
+              {formError}
+            </div>
+          )}
+          <div className="tasks-table-container">
+            <table className="tasks-table">
+              <thead>
+                <tr>
+                  <th>Phase</th><th>Task ID</th><th>Task Name</th><th>Start Date</th><th>End Date</th>
+                  <th>Predecessors</th><th>Hours<br/>Duration</th><th>Owner</th><th>% Complete</th><th>Status</th><th>Notes</th><th className="actions-header">Actions</th>
+                  {isMilestoneMode && <th>Milestone</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {displayTasks.map((task) => {
+                  if (editingRowId === task.id) {
+                    return (
+                      <tr key={task.id} className="new-task-row">
+                        <td>
+                          <select name="phase_id" value={formData.phase_id || ''} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '100px'}} required>
+                            <option value="">Phase...</option>
+                            {phases && phases.map(p => <option key={p.id} value={p.id}>{p.name.replace(/\[.*?\]\s*/, '')}</option>)}
+                          </select>
+                        </td>
+                        <td><input type="text" name="task_id" value={formData.task_id} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} disabled={task.id !== 'new'} /></td>
+                        <td><input type="text" name="task_name" value={formData.task_name} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '120px'}} required /></td>
+                        <td><input type="date" name="start_date" value={formData.start_date} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '110px'}} /></td>
+                        <td><input type="date" name="end_date" value={formData.end_date} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '110px'}} /></td>
+                        <td><input type="text" name="predecessors" value={formData.predecessors} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} /></td>
+                        <td><input type="number" name="duration" value={formData.duration} onChange={handleInputChange} min="1" style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} /></td>
+                        <td>
+                          <select name="owner" value={formData.owner} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc'}} required>
+                            {OWNERS.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </td>
+                        <td><input type="number" name="percent_complete" value={formData.percent_complete} onChange={handleInputChange} min="0" max="100" style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} /></td>
+                        <td>
+                          <select name="status" value={formData.status} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc'}} required>
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                        <td><input type="text" name="notes" value={formData.notes} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '100px'}} /></td>
+                        <td className="actions">
+                          <button className="btn-save" onClick={handleSubmit}>Save</button>
+                          <button className="btn-cancel" onClick={() => { resetForm(); setEditingRowId(null); }}>Cancel</button>
+                        </td>
+                        {isMilestoneMode && (
+                          <td><input type="checkbox" name="is_milestone" checked={formData.is_milestone === 1} onChange={handleInputChange} className="milestone-checkbox" /></td>
+                        )}
+                      </tr>
+                    );
+                  }
+  
+                  const phaseStyle = getPhaseStyle(task.phase_id);
+                  return (
+                    <tr key={task.id}>
+                      <td><span className="phase-button" style={phaseStyle}>{getPhaseName(task.phase_id)}</span></td>
+                      <td>{task.task_id}</td>
+                      <td>{task.task_name}</td>
+                      <td>{formatDate(task.start_date)}</td>
+                      <td>{formatDate(task.end_date)}</td>
+                      <td>{task.predecessors || '—'}</td>
+                      <td>{task.duration}</td>
+                      <td>{task.owner}</td>
+                      <td>
+                        <div className="progress-bar-cell">
+                          <div className="progress-bar-track"><div className="progress-bar-fill" style={{ width: `${task.percent_complete}%` }}></div></div>
+                          <span className="progress-bar-text">{task.percent_complete}%</span>
                         </div>
-                        <span className="progress-bar-text">{task.percent_complete}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`status-badge status-${task.status.toLowerCase().replace(' ', '-')}`}>
-                        {task.status}
-                      </span>
-                    </td>
-                    <td className="actions">
-                      <button className="btn-edit" onClick={() => handleEdit(task)}>Edit</button>
-                      <button className="btn-delete" onClick={() => handleDelete(task.id)}>Delete</button>
-                    </td>
-                    {isMilestoneMode && (
-                    <td>
-                      <input 
-                        type="checkbox" 
-                        checked={task.is_milestone === 1}
-                        onChange={() => handleToggleMilestone(task)}
-                        className="milestone-checkbox"
-                        title="Mark as Milestone"
-                      />
-                    </td>
-                    )}
-                  </tr>
-                );
-              })}
-              {isAdding && (
-  <tr className="new-task-row">
-    {/* Phase Dropdown */}
-    <td>
-  {!isCreatingNewPhase ? (
-    <div className="phase-select-row">
-      <select name="phase_id" value={formData.phase_id || ''} onChange={handleInputChange}>
-        <option value="">Select Phase</option>
-        {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        <option value="create-new">+ Create New Phase</option>
-      </select>
-      {formData.phase_id && (
-        <button
-          type="button"
-          className="phase-delete-x"
-          title="Delete this phase"
-          onClick={() => {
-            const phase = phases.find(p => p.id === formData.phase_id);
-            if (phase) handleDeletePhase(phase.id, phase.name);
-          }}
-        >
-          ×
-        </button>
-      )}
-    </div>
-  ) : (
-    <div className="new-phase-inline">
-      <input 
-        type="text" 
-        value={newPhaseName} 
-        onChange={(e) => setNewPhaseName(e.target.value)}
-        placeholder="Name..."
-        autoFocus
-      />
-      <div className="new-phase-actions">
-  <button type="button" className="btn-save" onClick={handleCreateNewPhase}>✓</button>
-  <button type="button" className="btn-cancel" onClick={() => setIsCreatingNewPhase(false)}>✕</button>
-</div>
-    </div>
-  )}
-</td>
-    {/* Auto-generated Task ID */}
-    <td>{formData.task_id}</td>
-    
-    <td><input type="text" name="task_name" value={formData.task_name} onChange={handleInputChange} placeholder="Task Name..." /></td>
-    <td><input type="date" name="start_date" value={formData.start_date} onChange={handleInputChange} /></td>
-    <td><input type="date" name="end_date" value={formData.end_date} onChange={handleInputChange} /></td>
-    <td><input type="text" name="predecessors" value={formData.predecessors} onChange={handleInputChange} /></td>
-    <td><input type="number" name="duration" value={formData.duration} onChange={handleInputChange} /></td>
-    
-    {/* Owner Dropdown */}
-    <td>
-      <select name="owner" value={formData.owner} onChange={handleInputChange}>
-        {OWNERS.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </td>
-    
-    {/* Progress Range Slider */}
-    <td>
-      <input 
-        type="range" 
-        name="percent_complete" 
-        min="0" max="100" 
-        value={formData.percent_complete} 
-        onChange={handleInputChange} 
-        style={{ width: '80px' }}
-      />
-      <span>{formData.percent_complete}%</span>
-    </td>
-    
-    {/* Status Dropdown */}
-    <td>
-      <select name="status" value={formData.status} onChange={handleInputChange}>
-        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    </td>
-    
-    {/* Actions */}
-    <td className="actions">
-      <button className="btn-save" onClick={handleSubmit}>Save</button>
-      <button className="btn-cancel" onClick={resetForm}>Cancel</button>
-    </td>
-    {isMilestoneMode && (
-    <td><input type="checkbox" name="is_milestone" onChange={handleInputChange} /></td>
-    )}
-  </tr>
-)}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td><span className={`status-badge status-${task.status.toLowerCase().replace(' ', '-')}`}>{task.status}</span></td>
+                      <td>{task.notes || ''}</td>
+                      <td className="actions">
+                        <button className="btn-edit" onClick={() => handleEdit(task)}>Edit</button>
+                        <button className="btn-delete" onClick={() => handleDelete(task.id)}>Delete</button>
+                      </td>
+                      {isMilestoneMode && (
+                        <td><input type="checkbox" checked={task.is_milestone === 1} onChange={() => handleToggleMilestone(task)} className="milestone-checkbox" title="Mark as Milestone" /></td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
-      {!isAdding && (
-        <div className="add-task-footer">
-          <button 
-            className="btn-add"
-            onClick={() => {
-              resetForm();
-              setIsAdding(true);
-            }}
-          >
-            + Add New Task
-          </button>
-        </div>
-      )}
-      
+      <div className="add-task-footer"><button className="btn-add" onClick={() => { resetForm(); setEditingRowId('new'); }}>+ Add New Task</button></div>
     </div>
   );
 }

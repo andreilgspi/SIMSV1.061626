@@ -7,7 +7,8 @@ export const fetchProjects = async () => {
 };
 
 export const fetchTasksByProject = async (projectId) => {
-  const { data, error } = await supabase.from('tasks').select('*').eq('project_id', projectId);
+  // Changed from 'tasks' to 'workbook' to separate Gantt data from Agile Sprint data
+  const { data, error } = await supabase.from('workbook').select('*').eq('project_id', projectId);
   if (error) throw error;
   return data || [];
 };

@@ -241,8 +241,13 @@ function AppContent() {
             selectedProject={selectedProject}
           />
         } />
+        {/* 3. Add Sprint Tracker Routing */}
         <Route path="/sprint-tracker" element={
-          <SprintTrackerPage />
+          <SprintTrackerPage 
+            selectedProject={selectedProject} 
+            phases={phases}
+            fetchPhases={() => fetchPhases(selectedProject?.id)}
+          />
         } />
       </Routes>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
-import Workbook from './components/Workbook';
+import Dashboard from './components/dashboard';
+import Workbook from './components/workbook';
 import Projects from './components/Projects';
 import Milestones from './components/Milestones';
 import SprintTrackerPage from './components/SprintTrackerPage';

@@ -1,9 +1,10 @@
-// src/components/SprintMaster.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { useModal } from './ModalProvider';
 import './SprintTracker.css';
 
 const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
+  const { showAlert, showConfirm } = useModal();
   const [tasks, setTasks] = useState([]);
   const [developers, setDevelopers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,8 +20,6 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
   const [floatingPrompt, setFloatingPrompt] = useState({ isOpen: false, type: '', taskId: null });
   const [promptValue, setPromptValue] = useState('');
   
-  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
-  const [deletePrompt, setDeletePrompt] = useState({ isOpen: false, taskId: null });
   const [isPhaseManagerOpen, setIsPhaseManagerOpen] = useState(false);
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -125,20 +124,21 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
         const { data, error } = await supabase.from('phases').insert([{ project_id: selectedProject.id, name: promptValue }]).select();
         if (error) throw error;
         if (data && data.length > 0) {
-          await fetchPhases(); // Sync global phases prop
+          await fetchPhases();
           handleTaskChange(floatingPrompt.taskId, 'phase', data[0].name);
         }
-      } catch (err) { alert(`Error creating phase: ${err.message}`); }
+      } catch (err) { showAlert(`Error creating phase: ${err.message}`); }
     }
     setFloatingPrompt({ isOpen: false, type: '', taskId: null });
   };
 
   const handleDeletePhase = async (phaseId) => {
-    if (window.confirm("Delete this phase? Tasks using it might lose their phase mapping.")) {
+    const confirmed = await showConfirm("Delete this phase? Tasks using it might lose their phase mapping.");
+    if (confirmed) {
       try {
         await supabase.from('phases').delete().eq('id', phaseId);
-        await fetchPhases(); // Sync global phases prop
-      } catch (err) { alert(`Error deleting phase: ${err.message}`); }
+        await fetchPhases();
+      } catch (err) { showAlert(`Error deleting phase: ${err.message}`); }
     }
   };
 
@@ -204,20 +204,21 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
       setOriginalTaskData(null);
     } catch (error) { 
       console.error("Error updating:", error.message); 
-      setAlertModal({ isOpen: true, title: 'Database Error', message: error.message });
+      showAlert(`Database Error: ${error.message}`);
     }
   };
 
-  const confirmDeleteTask = async () => {
+  const confirmDeleteTask = async (taskId) => {
+    const confirmed = await showConfirm('Are you sure you want to delete this task? This action cannot be undone.');
+    if (!confirmed) return;
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', deletePrompt.taskId);
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
-      setTasks(tasks.filter(task => task.id !== deletePrompt.taskId));
-      if (editingRowId === deletePrompt.taskId) setEditingRowId(null);
-      setDeletePrompt({ isOpen: false, taskId: null });
+      setTasks(tasks.filter(task => task.id !== taskId));
+      if (editingRowId === taskId) setEditingRowId(null);
     } catch (error) { 
       console.error("Error deleting:", error.message); 
-      setAlertModal({ isOpen: true, title: 'Error Deleting Task', message: error.message });
+      showAlert(`Error Deleting Task: ${error.message}`);
     }
   };
 
@@ -242,43 +243,6 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
               ))}
             </div>
             <button style={{width: '100%', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer'}} onClick={() => setIsPhaseManagerOpen(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {/* VALIDATION ALERT */}
-      {alertModal.isOpen && (
-        <div style={overlayStyle}>
-          <div className="alert-modal-card" style={{ width: '340px', padding: '24px', background: '#fff', borderRadius: '16px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-            <h4 style={{ color: '#1c1c1e', margin: '0 0 12px 0', fontSize: '1.2rem' }}>{alertModal.title}</h4>
-            <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 24px 0', lineHeight: '1.5' }}>{alertModal.message}</p>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-              <button style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }} onClick={() => setAlertModal({ isOpen: false, title: '', message: '' })}>Got it</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STRICTLY EQUAL DELETE CONFIRMATION MODAL */}
-      {deletePrompt.isOpen && (
-        <div style={overlayStyle}>
-          <div className="alert-modal-card" style={{ width: '340px', padding: '24px', background: '#fff', borderRadius: '16px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)', borderTop: '4px solid #ff3b30' }}>
-            <h4 style={{ color: '#1c1c1e', margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Task</h4>
-            <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 24px 0', lineHeight: '1.5' }}>Are you sure? This action cannot be undone.</p>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-              <button 
-                onClick={() => setDeletePrompt({ isOpen: false, taskId: null })}
-                style={{ flex: '1 1 0', padding: '12px', background: '#e5e5ea', color: '#1c1c1e', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmDeleteTask}
-                style={{ flex: '1 1 0', padding: '12px', background: '#ff3b30', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-              >
-                Delete
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -372,7 +336,7 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
                         ) : (
                            <>
                              <button onClick={() => startEditingRow(task)} className="action-btn btn-edit">Edit</button>
-                             <button onClick={() => setDeletePrompt({ isOpen: true, taskId: task.id })} className="action-btn btn-delete">Delete</button>
+                             <button onClick={() => confirmDeleteTask(task.id)} className="action-btn btn-delete">Delete</button>
                            </>
                         )}
                       </div>
@@ -386,6 +350,6 @@ const SprintMaster = ({ selectedProject, phases, fetchPhases }) => {
       </div>
     </div>
   );
-};
+}
 
 export default SprintMaster;

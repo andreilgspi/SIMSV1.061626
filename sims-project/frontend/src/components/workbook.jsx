@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { useModal } from './ModalProvider';
 import './workbook.css';
 
 const OWNERS = ['PM', 'UI UX', 'Team', 'KC', 'Jess', 'Franco', 'Mayon', 'Rica, QA 2'];
-const STATUSES = ['Not Started', 'In Progress', 'On Hold', 'Complete', 'Cancelled'];
+const STATUSES = ['Not Started', 'In Progress', 'On Hold', 'Complete', 'Blocked'];
+
+const calculateWorkingHours = (start, end) => {
+  if (!start || !end) return 1;
+  let count = 0;
+  let curDate = new Date(start);
+  const endDate = new Date(end);
+  while (curDate <= endDate) {
+    const dayOfWeek = curDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return count * 8;
+};
 
 function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
+  const { showAlert, showConfirm } = useModal();
   const [editingRowId, setEditingRowId] = useState(null);
   const [lastPhaseId, setLastPhaseId] = useState(null);
   const [isCreatingNewPhase, setIsCreatingNewPhase] = useState(false);
@@ -16,7 +31,6 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
   const [isMilestoneMode, setIsMilestoneMode] = useState(false);
   const [isPhaseManagerOpen, setIsPhaseManagerOpen] = useState(false);
   const [formError, setFormError] = useState('');
-  const [taskToDelete, setTaskToDelete] = useState(null);
   const [formData, setFormData] = useState({
     project_id: selectedProject ? selectedProject.id : null,
     phase_id: null,
@@ -64,8 +78,28 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
     const phaseMatch = phase.name.match(/\[P(\d+)\]/);
     const phaseNumber = phaseMatch ? parseInt(phaseMatch[1]) : 1;
     const phaseTasks = tasks.filter(t => t.phase_id === phaseId);
-    if (phaseTasks.length === 0) return String(phaseNumber);
-    return `${phaseNumber}.${phaseTasks.length + 1}`;
+    
+    if (phaseTasks.length === 0) {
+      return `${phaseNumber}.1`;
+    }
+    
+    let maxTaskNum = 0;
+    phaseTasks.forEach(t => {
+      if (t.task_id && String(t.task_id).includes('.')) {
+        const decimalPart = parseInt(String(t.task_id).split('.')[1]);
+        if (!isNaN(decimalPart) && decimalPart > maxTaskNum) {
+          maxTaskNum = decimalPart;
+        }
+      } else if (String(t.task_id) === String(phaseNumber)) {
+        if (maxTaskNum < 1) maxTaskNum = 1;
+      }
+    });
+    
+    if (maxTaskNum === 0) {
+      maxTaskNum = phaseTasks.length;
+    }
+    
+    return `${phaseNumber}.${maxTaskNum + 1}`;
   };
 
   useEffect(() => {
@@ -90,7 +124,7 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
   useEffect(() => {
     setFormData(prev => {
       const { status, percent_complete } = prev;
-      if (status === 'Cancelled') return prev;
+      if (status === 'Blocked') return prev;
       if (percent_complete === 100 && status !== 'Complete') return { ...prev, status: 'Complete' };
       if (percent_complete === 0 && status !== 'Not Started') return { ...prev, status: 'Not Started' };
       if (percent_complete > 0 && percent_complete < 100 && (status === 'Complete' || status === 'Not Started')) {
@@ -129,22 +163,26 @@ function Workbook({ tasks, selectedProject, phases, fetchTasks, fetchPhases }) {
       return;
     }
     if (name === 'start_date') {
-  setFormData(prev => ({
-    ...prev,
-    start_date: value,
-    end_date: prev.end_date && value && prev.end_date < value ? '' : prev.end_date
-  }));
-  return;
-}
+      const newEndDate = formData.end_date && value && formData.end_date < value ? '' : formData.end_date;
+      const newDuration = (value && newEndDate) ? calculateWorkingHours(value, newEndDate) : formData.duration;
+      setFormData(prev => ({
+        ...prev,
+        start_date: value,
+        end_date: newEndDate,
+        duration: newDuration
+      }));
+      return;
+    }
 
-if (name === 'end_date') {
-  if (formData.start_date && value && value < formData.start_date) {
-    alert("End date can't be earlier than the start date.");
-    return;
-  }
-  setFormData(prev => ({ ...prev, end_date: value }));
-  return;
-}
+    if (name === 'end_date') {
+      if (formData.start_date && value && value < formData.start_date) {
+        showAlert("End date can't be earlier than the start date.");
+        return;
+      }
+      const newDuration = (formData.start_date && value) ? calculateWorkingHours(formData.start_date, value) : formData.duration;
+      setFormData(prev => ({ ...prev, end_date: value, duration: newDuration }));
+      return;
+    }
 
     if (type === 'checkbox') setFormData(prev => ({ ...prev, [name]: checked ? 1 : 0 }));
     else if (name === 'phase_id') setFormData(prev => ({ ...prev, phase_id: value ? Number(value) : '' }));
@@ -179,7 +217,7 @@ if (name === 'end_date') {
           setIsCreatingNewPhase(false);
           setNewPhaseName('');
         }
-      } catch (error) { alert(`Error creating phase: ${error.message}`); }
+      } catch (error) { showAlert(`Error creating phase: ${error.message}`); }
     }
   };
 
@@ -189,27 +227,41 @@ if (name === 'end_date') {
       ? `"${phaseName}" has ${taskCount} task(s) assigned to it. Deleting it may orphan those tasks. Delete anyway?`
       : `Delete phase "${phaseName}"?`;
 
-    if (window.confirm(message)) {
+    const confirmed = await showConfirm(message);
+    if (confirmed) {
       try {
         const { error } = await supabase.from('phases').delete().eq('id', phaseId);
         if (error) throw error;
         await fetchPhases();
         if (formData.phase_id === phaseId) setFormData(prev => ({ ...prev, phase_id: null }));
         if (lastPhaseId === phaseId) setLastPhaseId(null);
-      } catch (error) { alert(`Error deleting phase: ${error.message}`); }
+      } catch (error) { showAlert(`Error deleting phase: ${error.message}`); }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
-  alert("End date can't be earlier than the start date.");
-  return;
-}
+      showAlert("End date can't be earlier than the start date.");
+      return;
+    }
+
+    const isDuplicate = tasks.some(t => 
+      t.phase_id === formData.phase_id && 
+      t.task_id === formData.task_id && 
+      t.id !== editingRowId
+    );
+    if (isDuplicate) {
+      showAlert(`Task ID "${formData.task_id}" already exists in this phase.`);
+      return;
+    }
 
     setFormError('');
-    if (!validatePredecessors(formData.predecessors)) {
-      setFormError("Validation Error: Predecessor task is not 'Complete' or does not exist.");
+    const predCheck = validatePredecessors(formData.predecessors);
+    if (!predCheck.valid) {
+      const msg = `Validation Error: Predecessor task ${predCheck.errorId} is not 'Complete' or does not exist.`;
+      setFormError(msg);
+      showAlert(msg);
       return; 
     }
     
@@ -254,25 +306,20 @@ if (name === 'end_date') {
     try {
       const { error } = await supabase.from('workbook').update({ is_milestone: updatedTask.is_milestone }).eq('id', task.id);
       if (!error) await fetchTasks();
-    } catch (error) { alert(`Error updating milestone: ${error.message}`); }
+    } catch (error) { showAlert(`Error updating milestone: ${error.message}`); }
   };
 
-  const handleDelete = (id) => {
-  setTaskToDelete(id);
-};
-
-const confirmDeleteTask = async () => {
-  if (!taskToDelete) return;
-  try {
-    const { error } = await supabase.from('workbook').delete().eq('id', taskToDelete);
-    if (error) throw error;
-    await fetchTasks();
-  } catch (error) {
-    alert(`Error deleting task: ${error.message}`);
-  } finally {
-    setTaskToDelete(null);
-  }
-};
+  const handleDeleteTask = async (id) => {
+    const confirmed = await showConfirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    try {
+      const { error } = await supabase.from('workbook').delete().eq('id', id);
+      if (error) throw error;
+      await fetchTasks();
+    } catch (error) {
+      showAlert(`Error deleting task: ${error.message}`);
+    }
+  };
 
   const handleEdit = (task) => {
     setEditingRowId(task.id);
@@ -317,16 +364,15 @@ const confirmDeleteTask = async () => {
   const toggleOwnerFilter = (owner) => setOwnerFilter(prev => prev.includes(owner) ? prev.filter(o => o !== owner) : [...prev, owner]);
   
   const validatePredecessors = (predecessorInput) => {
-    if (!predecessorInput) return true;
+    if (!predecessorInput) return { valid: true };
     const predecessors = predecessorInput.split(',').map(s => s.trim());
     for (const predId of predecessors) {
       const foundTask = tasks.find(t => t.task_id === predId);
       if (!foundTask || foundTask.status !== 'Complete') {
-        alert(`Validation Error: Predecessor task ${predId} is not 'Complete' or does not exist.`);
-        return false;
+        return { valid: false, errorId: predId };
       }
     }
-    return true;
+    return { valid: true };
   };
 
   const clearOwnerFilter = () => setOwnerFilter([]);
@@ -440,7 +486,7 @@ const confirmDeleteTask = async () => {
                         <td><input type="text" name="task_id" value={formData.task_id} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} disabled={task.id !== 'new'} /></td>
                         <td><input type="text" name="task_name" value={formData.task_name} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '120px'}} required /></td>
                         <td><input type="date" name="start_date" value={formData.start_date} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '110px'}} /></td>
-                        <td><input type="date" name="end_date" value={formData.end_date} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '110px'}} min={formData.start_date || undefined} /></td>
+                        <td><input type="date" name="end_date" value={formData.end_date} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '110px'}} min={formData.start_date || new Date().toISOString().split('T')[0]} /></td>
                         <td><input type="text" name="predecessors" value={formData.predecessors} onChange={handleInputChange} style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} /></td>
                         <td><input type="number" name="duration" value={formData.duration} onChange={handleInputChange} min="1" style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '60px'}} /></td>
                         <td>
@@ -487,7 +533,7 @@ const confirmDeleteTask = async () => {
                       <td>{task.notes || ''}</td>
                       <td className="actions">
                         <button className="btn-edit" onClick={() => handleEdit(task)}>Edit</button>
-                        <button className="btn-delete" onClick={() => handleDelete(task.id)}>Delete</button>
+                        <button className="btn-delete" onClick={() => handleDeleteTask(task.id)}>Delete</button>
                       </td>
                       {isMilestoneMode && (
                         <td><input type="checkbox" checked={task.is_milestone === 1} onChange={() => handleToggleMilestone(task)} className="milestone-checkbox" title="Mark as Milestone" /></td>
@@ -502,17 +548,6 @@ const confirmDeleteTask = async () => {
       )}
 
       <div className="add-task-footer"><button className="btn-add" onClick={() => { resetForm(); setEditingRowId('new'); }}>+ Add New Task</button></div>
-      {taskToDelete && (
-  <div className="confirm-modal-overlay" onClick={() => setTaskToDelete(null)}>
-    <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-      <p>Are you sure you want to delete this task?</p>
-      <div className="confirm-modal-actions">
-        <button className="btn-cancel" onClick={() => setTaskToDelete(null)}>Cancel</button>
-        <button className="btn-delete-confirm" onClick={confirmDeleteTask}>Delete</button>
-      </div>
-    </div>
-  </div>
-)}
     </div>
   );
 }

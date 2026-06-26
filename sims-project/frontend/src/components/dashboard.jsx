@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './dashboard.css';
 
-function Dashboard({ tasks, selectedProject }) {
+function Dashboard({ tasks, selectedProject, projectPhases }) {
   const [metrics, setMetrics] = useState(null);
   const [phases, setPhases] = useState([]);
 
@@ -50,21 +50,13 @@ function Dashboard({ tasks, selectedProject }) {
     
     const approxHoursRendered = workingDaysElapsed * 8;
     
-    const totalDuration = Math.floor((projectEnd - projectStart) / (1000 * 60 * 60 * 24));
-    const plannedCompletion = totalDuration > 0 ? (totalElapsedDays / totalDuration) * 100 : 0;
-    
-    let scheduleStatus = 'On Track';
-    let statusColor = '#34c759';
-    if (avgPercentComplete > plannedCompletion + 10) {
-      scheduleStatus = 'Ahead';
-      statusColor = '#34c759';
-    } else if (avgPercentComplete < plannedCompletion - 10) {
-      scheduleStatus = 'At Risk';
-      statusColor = '#ff9500';
-    } else if (avgPercentComplete < plannedCompletion - 25) {
-      scheduleStatus = 'Behind';
-      statusColor = '#ff3b30';
-    }
+    const hasOverdue = tasks.some(t => {
+      if (t.status === 'Complete' || t.status === 'On Hold' || t.status === 'Blocked') return false;
+      return new Date(t.end_date) < today;
+    });
+
+    const scheduleStatus = hasOverdue ? 'Behind' : 'On Track';
+    const statusColor = hasOverdue ? '#ff3b30' : '#34c759';
     
     setMetrics({
       projectTitle: selectedProject ? selectedProject.name : 'SIMS PROJECT DASHBOARD',
@@ -91,7 +83,14 @@ function Dashboard({ tasks, selectedProject }) {
     const phaseMap = {};
     
     tasks.forEach(task => {
-      const phaseName = task.phase_name || task.phase || 'Unknown';
+      let phaseName = 'Unknown';
+      if (projectPhases && projectPhases.length > 0) {
+        const foundPhase = projectPhases.find(p => p.id === task.phase_id);
+        if (foundPhase) phaseName = foundPhase.name;
+      } else {
+        phaseName = task.phase_name || task.phase || 'Unknown';
+      }
+      
       if (!phaseMap[phaseName]) {
         phaseMap[phaseName] = {
           phase: phaseName,

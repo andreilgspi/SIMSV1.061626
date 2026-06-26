@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { fetchPhasesByProject } from '../services/database';
 import './Milestones.css';
 
 function Milestones({ selectedProject }) {
@@ -15,9 +17,26 @@ function Milestones({ selectedProject }) {
     if (!selectedProject) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/milestones/${selectedProject.id}`);
-      const data = await response.json();
-      setMilestones(data);
+      const { data: milestonesData, error } = await supabase
+        .from('workbook')
+        .select('*')
+        .eq('project_id', selectedProject.id)
+        .eq('is_milestone', 1)
+        .order('id');
+      
+      if (error) throw error;
+      
+      const phasesData = await fetchPhasesByProject(selectedProject.id);
+      
+      const formattedData = milestonesData.map(task => {
+        const phase = phasesData.find(p => p.id === task.phase_id);
+        return {
+          ...task,
+          phase_name: phase ? phase.name : 'Unknown Phase'
+        };
+      });
+      
+      setMilestones(formattedData);
     } catch (error) {
       console.error('Error fetching milestones:', error);
     } finally {

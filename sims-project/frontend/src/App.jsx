@@ -5,6 +5,7 @@ import Workbook from './components/Workbook';
 import Projects from './components/Projects';
 import Milestones from './components/Milestones';
 import SprintTrackerPage from './components/SprintTrackerPage';
+import { ModalProvider } from './components/ModalProvider';
 import './App.css';
 import * as db from './services/database';
 
@@ -216,6 +217,7 @@ function AppContent() {
           <Dashboard 
             tasks={tasks} 
             selectedProject={selectedProject}
+            projectPhases={phases}
           />
         } />
         <Route path="/workbook" element={
@@ -258,7 +260,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <ModalProvider>
+        <AppContent />
+      </ModalProvider>
     </Router>
   );
 }

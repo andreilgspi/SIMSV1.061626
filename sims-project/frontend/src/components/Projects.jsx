@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import * as db from '../services/database';
+import { useModal } from './ModalProvider';
 import './Projects.css';
 
 function Projects({ projects, selectedProject, onSelectProject, fetchProjects }) {
+  const { showAlert, showConfirm } = useModal();
+  
   // --- Project States ---
   const [isCreating, setIsCreating] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '', start_date: '', end_date: '', team: [] });
@@ -194,7 +197,14 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleCreateProject = async (e) => {
     e.preventDefault();
     try {
-      const data = await db.createProject(newProject);
+      if (newProject.start_date && newProject.end_date && newProject.end_date < newProject.start_date) {
+        showAlert("End date can't be earlier than the start date.");
+        return;
+      }
+      const dataToSave = { ...newProject };
+      delete dataToSave.team;
+      
+      const data = await db.createProject(dataToSave);
       await fetchProjects();
       setIsCreating(false);
       setShowCreateMenu(false);
@@ -206,7 +216,14 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   const handleUpdateProject = async (e) => {
     e.preventDefault();
     try {
-      await db.updateProject(editingProject.id, editingProject);
+      if (editingProject.start_date && editingProject.end_date && editingProject.end_date < editingProject.start_date) {
+        showAlert("End date can't be earlier than the start date.");
+        return;
+      }
+      const dataToSave = { ...editingProject };
+      delete dataToSave.team;
+
+      await db.updateProject(editingProject.id, dataToSave);
       await fetchProjects();
       setIsEditing(false);
       setShowDropdown(false);
@@ -220,7 +237,8 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   };
 
   const handleDeleteProject = async (id) => {
-    if (window.confirm('Delete this project?')) {
+    const confirmed = await showConfirm('Delete this project?');
+    if (confirmed) {
       await db.deleteProject(id);
       await fetchProjects();
       setShowDropdown(false);
@@ -251,7 +269,8 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
   };
 
   const handleDeleteDeveloper = async (id) => {
-    if (window.confirm('Are you sure you want to delete this developer?')) {
+    const confirmed = await showConfirm('Are you sure you want to delete this developer?');
+    if (confirmed) {
       try {
         await db.deleteDeveloper(id);
         await fetchDevelopers();
@@ -485,6 +504,17 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                        <div className="form-group full-width"><label>Name *</label><input type="text" name="name" onChange={handleInputChange} required /></div>
                        <div className="form-group full-width"><label>Description</label><textarea name="description" onChange={handleInputChange} /></div>
                        
+                       <div className="form-grid">
+                         <div className="form-group full-width">
+                           <label>Start Date</label>
+                           <input type="date" name="start_date" onChange={handleInputChange} />
+                         </div>
+                         <div className="form-group full-width">
+                           <label>End Date</label>
+                           <input type="date" name="end_date" onChange={handleInputChange} min={newProject.start_date || new Date().toISOString().split('T')[0]} />
+                         </div>
+                       </div>
+                       
                        <div className="form-group full-width">
                          <label>Assign Developers</label>
                          <div className="assignee-tags-container" style={{ border: '1px solid #e5e5ea', padding: '10px', borderRadius: '8px' }}>
@@ -546,7 +576,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
                  </div>
                  <div className="form-group full-width">
                    <label>End Date</label>
-                   <input type="date" name="end_date" value={editingProject.end_date || ''} onChange={handleEditInputChange} />
+                   <input type="date" name="end_date" value={editingProject.end_date || ''} onChange={handleEditInputChange} min={editingProject.start_date || ''} />
                  </div>
                </div>
                

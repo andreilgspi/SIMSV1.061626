@@ -8,6 +8,9 @@ import SprintTrackerPage from './components/SprintTrackerPage';
 import { ModalProvider } from './components/ModalProvider';
 import './App.css';
 import * as db from './services/database';
+import { supabase } from './supabaseClient';
+import Login from './components/Login';
+import CreateAcc from './components/CreateAcc';
 
 function AppContent() {
   const location = useLocation();
@@ -184,6 +187,27 @@ function AppContent() {
               </div>
             )}
             <div className="navbar-spacer"></div>
+            <button 
+              onClick={() => supabase.auth.signOut()} 
+              className="navbar-logout-btn"
+              style={{
+                background: 'rgba(255, 59, 48, 0.12)',
+                color: '#ff3b30',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                marginLeft: '12px',
+                alignSelf: 'center'
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
+            >
+              Sign Out
+            </button>
           </div>
           <div className="navbar-new-nav">
             <div className="navbar-nav-links">
@@ -258,6 +282,36 @@ function AppContent() {
 
 // FIXED: Re-added the main App wrapper for the Router
 function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authView, setAuthView] = useState('login'); // 'login' or 'register'
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+    return <div className="loading">Checking authentication...</div>;
+  }
+
+  if (!session) {
+    return authView === 'login' ? (
+      <Login onNavigateToRegister={() => setAuthView('register')} />
+    ) : (
+      <CreateAcc onNavigateToLogin={() => setAuthView('login')} />
+    );
+  }
+
   return (
     <Router>
       <ModalProvider>

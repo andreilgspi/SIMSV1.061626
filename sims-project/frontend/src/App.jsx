@@ -11,6 +11,7 @@ import * as db from './services/database';
 import { supabase } from './supabaseClient';
 import Login from './components/Login';
 import CreateAcc from './components/CreateAcc';
+import UserSettings from './components/UserSettings';
 
 function AppContent() {
   const location = useLocation();
@@ -20,6 +21,7 @@ function AppContent() {
   const [phases, setPhases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projectTasks, setProjectTasks] = useState({});
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   const isProjectsPage = location.pathname === '/projects';
 
@@ -187,27 +189,46 @@ function AppContent() {
               </div>
             )}
             <div className="navbar-spacer"></div>
-            <button 
-              onClick={() => supabase.auth.signOut()} 
-              className="navbar-logout-btn"
-              style={{
-                background: 'rgba(255, 59, 48, 0.12)',
-                color: '#ff3b30',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-                marginLeft: '12px',
-                alignSelf: 'center'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
-            >
-              Sign Out
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <button 
+                onClick={() => setShowSettingsModal(true)} 
+                className="navbar-settings-btn"
+                style={{
+                  background: 'rgba(0, 122, 255, 0.12)',
+                  color: '#007aff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.12)'}
+              >
+                👤
+              </button>
+              <button 
+                onClick={() => supabase.auth.signOut()} 
+                className="navbar-logout-btn"
+                style={{
+                  background: 'rgba(255, 59, 48, 0.12)',
+                  color: '#ff3b30',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
           <div className="navbar-new-nav">
             <div className="navbar-nav-links">
@@ -260,6 +281,8 @@ function AppContent() {
             onSelectProject={handleSelectProject}
             fetchProjects={fetchProjects}
             onProjectCreated={handleProjectCreated}
+            onSettingsClick={() => setShowSettingsModal(true)}
+            onSignOut={() => supabase.auth.signOut()}
           />
         } />
         <Route path="/milestones" element={
@@ -276,6 +299,10 @@ function AppContent() {
           />
         } />
       </Routes>
+      
+      {showSettingsModal && (
+        <UserSettings onClose={() => setShowSettingsModal(false)} />
+      )}
     </div>
   );
 }

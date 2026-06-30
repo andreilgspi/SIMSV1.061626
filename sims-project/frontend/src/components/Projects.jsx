@@ -4,7 +4,7 @@ import * as db from '../services/database';
 import { useModal } from './ModalProvider';
 import './Projects.css';
 
-function Projects({ projects, selectedProject, onSelectProject, fetchProjects }) {
+function Projects({ projects, selectedProject, onSelectProject, fetchProjects, onSettingsClick, onSignOut }) {
   const { showAlert, showConfirm } = useModal();
   
   // --- Project States ---
@@ -202,7 +202,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
         return;
       }
       const dataToSave = { ...newProject };
-      delete dataToSave.team;
       
       const data = await db.createProject(dataToSave);
       await fetchProjects();
@@ -221,7 +220,6 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
         return;
       }
       const dataToSave = { ...editingProject };
-      delete dataToSave.team;
 
       await db.updateProject(editingProject.id, dataToSave);
       await fetchProjects();
@@ -312,6 +310,44 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects })
               <span className="project-status-dot" style={{ backgroundColor: getStatusColor(calculateProjectStatus(selectedProject)) }}></span>
             </div>
           )}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button 
+              onClick={onSettingsClick} 
+              style={{
+                background: 'rgba(0, 122, 255, 0.12)',
+                color: '#007aff',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.2)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.12)'}
+            >
+              👤
+            </button>
+            <button 
+              onClick={onSignOut} 
+              style={{
+                background: 'rgba(255, 59, 48, 0.12)',
+                color: '#ff3b30',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
         <div className="projects-header-nav">
           <div className="projects-nav-links">

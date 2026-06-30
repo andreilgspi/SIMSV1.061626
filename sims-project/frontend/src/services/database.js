@@ -1,26 +1,45 @@
 import { supabase } from '../supabaseClient';
 
+const getCurrentUserId = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id;
+};
+
 export const fetchProjects = async () => {
-  const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+  const userId = await getCurrentUserId();
+  let query = supabase.from('projects').select('*').order('created_at', { ascending: false });
+  if (userId) query = query.eq('user_id', userId);
+  
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 };
 
 export const fetchTasksByProject = async (projectId) => {
-  // Changed from 'tasks' to 'workbook' to separate Gantt data from Agile Sprint data
-  const { data, error } = await supabase.from('workbook').select('*').eq('project_id', projectId);
+  const userId = await getCurrentUserId();
+  let query = supabase.from('workbook').select('*').eq('project_id', projectId);
+  if (userId) query = query.eq('user_id', userId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 };
 
 export const fetchPhasesByProject = async (projectId) => {
-  const { data, error } = await supabase.from('phases').select('*').eq('project_id', projectId);
+  const userId = await getCurrentUserId();
+  let query = supabase.from('phases').select('*').eq('project_id', projectId);
+  if (userId) query = query.eq('user_id', userId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 };
 
 export const createProject = async (projectData) => {
-  const { data, error } = await supabase.from('projects').insert([projectData]).select();
+  const userId = await getCurrentUserId();
+  const insertData = userId ? { ...projectData, user_id: userId } : projectData;
+  
+  const { data, error } = await supabase.from('projects').insert([insertData]).select();
   if (error) throw error;
   return data ? data[0] : null;
 };
@@ -38,13 +57,20 @@ export const deleteProject = async (id) => {
 };
 
 export const fetchDevelopers = async () => {
-  const { data, error } = await supabase.from('developers').select('*');
+  const userId = await getCurrentUserId();
+  let query = supabase.from('developers').select('*');
+  if (userId) query = query.eq('user_id', userId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 };
 
 export const createDeveloper = async (devData) => {
-  const { data, error } = await supabase.from('developers').insert([devData]).select();
+  const userId = await getCurrentUserId();
+  const insertData = userId ? { ...devData, user_id: userId } : devData;
+
+  const { data, error } = await supabase.from('developers').insert([insertData]).select();
   if (error) throw error;
   return data ? data[0] : null;
 };

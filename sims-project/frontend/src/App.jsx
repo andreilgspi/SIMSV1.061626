@@ -22,6 +22,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [projectTasks, setProjectTasks] = useState({});
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const isProjectsPage = location.pathname === '/projects';
 
@@ -189,7 +190,15 @@ function AppContent() {
               </div>
             )}
             <div className="navbar-spacer"></div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            
+            <button 
+              className="navbar-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              ☰
+            </button>
+
+            <div className={`navbar-actions ${isMobileMenuOpen ? 'open' : ''}`}>
               <button 
                 onClick={() => setShowSettingsModal(true)} 
                 className="navbar-settings-btn"
@@ -230,25 +239,25 @@ function AppContent() {
               </button>
             </div>
           </div>
-          <div className="navbar-new-nav">
+          <div className={`navbar-new-nav ${isMobileMenuOpen ? 'open' : ''}`}>
             <div className="navbar-nav-links">
-              <Link to="/" className={`navbar-nav-link ${currentPage === 'Dashboard' ? 'active' : ''}`}>
+              <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`navbar-nav-link ${currentPage === 'Dashboard' ? 'active' : ''}`}>
                 <span className="nav-icon">◇</span>
                 Dashboard
               </Link>
-              <Link to="/workbook" className={`navbar-nav-link ${currentPage === 'Workbook' ? 'active' : ''}`}>
+              <Link to="/workbook" onClick={() => setIsMobileMenuOpen(false)} className={`navbar-nav-link ${currentPage === 'Workbook' ? 'active' : ''}`}>
                 <span className="nav-icon">▣</span>
                 Workbook
               </Link>
-              <Link to="/milestones" className={`navbar-nav-link ${currentPage === 'Milestones' ? 'active' : ''}`}>
+              <Link to="/milestones" onClick={() => setIsMobileMenuOpen(false)} className={`navbar-nav-link ${currentPage === 'Milestones' ? 'active' : ''}`}>
                 <span className="nav-icon">◈</span>
                 Milestones
               </Link>
-              <Link to="/sprint-tracker" className={`navbar-nav-link ${currentPage === 'Sprint Tracker' ? 'active' : ''}`}>
+              <Link to="/sprint-tracker" onClick={() => setIsMobileMenuOpen(false)} className={`navbar-nav-link ${currentPage === 'Sprint Tracker' ? 'active' : ''}`}>
                 <span className="nav-icon">▶</span>
                 Sprint Tracker
               </Link>
-              <Link to="/projects" className={`navbar-nav-link ${currentPage === 'Projects' ? 'active' : ''}`}>
+              <Link to="/projects" onClick={() => setIsMobileMenuOpen(false)} className={`navbar-nav-link ${currentPage === 'Projects' ? 'active' : ''}`}>
                 <span className="nav-icon">▣</span>
                 Projects
               </Link>

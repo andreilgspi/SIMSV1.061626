@@ -37,6 +37,7 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects, o
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [createType, setCreateType] = useState('project');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
@@ -310,52 +311,59 @@ function Projects({ projects, selectedProject, onSelectProject, fetchProjects, o
               <span className="project-status-dot" style={{ backgroundColor: getStatusColor(calculateProjectStatus(selectedProject)) }}></span>
             </div>
           )}
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <button 
-              onClick={onSettingsClick} 
-              style={{
-                background: 'rgba(0, 122, 255, 0.12)',
-                color: '#007aff',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.2)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.12)'}
+              className="navbar-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              👤
+              ☰
             </button>
-            <button 
-              onClick={onSignOut} 
-              style={{
-                background: 'rgba(255, 59, 48, 0.12)',
-                color: '#ff3b30',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
-            >
-              Sign Out
-            </button>
+
+            <div className={`projects-header-actions ${isMobileMenuOpen ? 'open' : ''}`}>
+              <button 
+                onClick={onSettingsClick} 
+                style={{
+                  background: 'rgba(0, 122, 255, 0.12)',
+                  color: '#007aff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgba(0, 122, 255, 0.12)'}
+              >
+                👤
+              </button>
+              <button 
+                onClick={onSignOut} 
+                style={{
+                  background: 'rgba(255, 59, 48, 0.12)',
+                  color: '#ff3b30',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgba(255, 59, 48, 0.12)'}
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="projects-header-nav">
+        <div className={`projects-header-nav ${isMobileMenuOpen ? 'open' : ''}`}>
           <div className="projects-nav-links">
-            <Link to="/projects" className="projects-nav-link active"><span className="nav-icon">▣</span>Projects</Link>
-            <Link to="/" className="projects-nav-link"><span className="nav-icon">◇</span>Dashboard</Link>
-            <Link to="/workbook" className="projects-nav-link"><span className="nav-icon">▣</span>Workbook</Link>
-            <Link to="/milestones" className="projects-nav-link"><span className="nav-icon">◈</span>Milestones</Link>
-            <Link to="/sprint-tracker" className="projects-nav-link"><span className="nav-icon">▶</span>Sprint Tracker</Link>
+            <Link to="/projects" onClick={() => setIsMobileMenuOpen(false)} className="projects-nav-link active"><span className="nav-icon">▣</span>Projects</Link>
+            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="projects-nav-link"><span className="nav-icon">◇</span>Dashboard</Link>
+            <Link to="/workbook" onClick={() => setIsMobileMenuOpen(false)} className="projects-nav-link"><span className="nav-icon">▣</span>Workbook</Link>
+            <Link to="/milestones" onClick={() => setIsMobileMenuOpen(false)} className="projects-nav-link"><span className="nav-icon">◈</span>Milestones</Link>
+            <Link to="/sprint-tracker" onClick={() => setIsMobileMenuOpen(false)} className="projects-nav-link"><span className="nav-icon">▶</span>Sprint Tracker</Link>
           </div>
         </div>
       </div>
